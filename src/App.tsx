@@ -56,18 +56,18 @@ const GROUP_COMPANIES = [
 // Presets for simulated internal employees
 const MOCK_EMPLOYEES: User[] = [
   {
+    email: "mk.rabbani.cse@gmail.com", // User email from metadata - Admin role
+    name: "MK Rabbani",
+    role: "Admin",
+    employeeId: "EMP-7392",
+    currentRole: "Lead Strategic Recruiter & Admin"
+  },
+  {
     email: "sadat.react@apex-digital.com",
     name: "Sadat Rahman",
     role: "Employee",
     employeeId: "EMP-9281",
     currentRole: "Software Engineer (Frontend)"
-  },
-  {
-    email: "mk.rabbani.cse@gmail.com", // User email from metadata
-    name: "Golam Rabbani",
-    role: "Employee",
-    employeeId: "EMP-7392",
-    currentRole: "Full Stack Web Developer"
   },
   {
     email: "admin.hq@apex-group.com",
@@ -79,8 +79,8 @@ const MOCK_EMPLOYEES: User[] = [
 ];
 
 export default function App() {
-  // Application Roles State Simulation
-  const [currentUser, setCurrentUser] = useState<User>(MOCK_EMPLOYEES[1]); // Default to candidate
+  // Application Roles State Simulation: Starts as null (Guest Mode) so any visitor can see all jobs
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   
   // Base DB sync states
   const [jobs, setJobs] = useState<JobPost[]>([]);
@@ -112,7 +112,18 @@ export default function App() {
   // Notification Pane drop-box state
   const [isNotificationPaneOpen, setIsNotificationPaneOpen] = useState(false);
 
-  // Forms / upload states for "Apply Internally"
+  // Dynamic public guest inputs (User can apply job without profile create)
+  const [guestName, setGuestName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestCurrentRole, setGuestCurrentRole] = useState("");
+  const [guestEmployeeId, setGuestEmployeeId] = useState("");
+
+  // Authenticated Login controls
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginEmailInput, setLoginEmailInput] = useState("");
+  const [loginError, setLoginError] = useState("");
+
+  // Forms / upload states for "Apply"
   const [coverLetter, setCoverLetter] = useState("");
   const [uploadedCvName, setUploadedCvName] = useState("");
   const [uploadedCvContent, setUploadedCvContent] = useState("");
@@ -131,13 +142,17 @@ export default function App() {
       const [jobsRes, appsRes, notifsRes, statsRes] = await Promise.all([
         fetch("/api/jobs"),
         fetch("/api/applications"),
-        fetch(`/api/notifications?email=${currentUser.email}`),
+        currentUser ? fetch(`/api/notifications?email=${currentUser.email}`) : Promise.resolve(null),
         fetch("/api/applications/stats")
       ]);
 
       if (jobsRes.ok) setJobs(await jobsRes.json());
       if (appsRes.ok) setApplications(await appsRes.json());
-      if (notifsRes.ok) setNotifications(await notifsRes.json());
+      if (notifsRes && notifsRes.ok) {
+        setNotifications(await notifsRes.json());
+      } else {
+        setNotifications([]);
+      }
       if (statsRes.ok) setDashboardStats(await statsRes.json());
     } catch (e) {
       console.error("Error communicating with Node backend:", e);
@@ -148,15 +163,21 @@ export default function App() {
     fetchAllData();
     // Setup background check for live status notifications (polling every 10 seconds for real-time vibe)
     const interval = setInterval(() => {
-      fetchNotifications();
-      if (currentUser.role === "Admin") {
-        fetchAppsAndStats();
+      if (currentUser) {
+        fetchNotifications();
+        if (currentUser.role === "Admin") {
+          fetchAppsAndStats();
+        }
       }
     }, 12000);
     return () => clearInterval(interval);
   }, [currentUser]);
 
   const fetchNotifications = async () => {
+    if (!currentUser) {
+      setNotifications([]);
+      return;
+    }
     try {
       const res = await fetch(`/api/notifications?email=${currentUser.email}`);
       if (res.ok) setNotifications(await res.json());
@@ -189,6 +210,47 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  // Dedicated custom login submission
+  const handleLoginSubmit = (email: string) => {
+    if (!email.trim()) {
+      setLoginError("Please provide a valid email address.");
+      return;
+    }
+    const cleaned = email.trim().toLowerCase();
+    const matched = MOCK_EMPLOYEES.find(e => e.email.toLowerCase() === cleaned);
+
+    if (matched) {
+      setCurrentUser(matched);
+    } else {
+      // Dynamic profile instantiation
+      const newUser: User = {
+        email: cleaned,
+        name: cleaned.split("@")[0].split(".").map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(" "),
+        role: cleaned === "mk.rabbani.cse@gmail.com" ? "Admin" : "Employee",
+        employeeId: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
+        currentRole: "Dynamic External Talent"
+      };
+      setCurrentUser(newUser);
+    }
+    
+    setIsLoginModalOpen(false);
+    setLoginError("");
+    setLoginEmailInput("");
+    setIsNotificationPaneOpen(false);
+    setSelectedApplication(null);
+    setSelectedJob(null);
+    setIsApplyDrawerOpen(false);
+    setCoverLetter("");
+    setUploadedCvName("");
+    setUploadedCvContent("");
+    setUploadedDocName("");
+    setGuestName("");
+    setGuestEmail("");
+    setGuestCurrentRole("");
+    setGuestEmployeeId("");
+    setApplyState({ loading: false, error: "", success: false });
   };
 
   // Change candidate/admin roles easily for verification
@@ -336,7 +398,8 @@ export default function App() {
         setUploadedCvContent(text);
       } else {
         // Fallback representable text for standard document files so Gemini has text to process
-        setUploadedCvContent(`[Uploaded ${file.name}] Raw file data extracted: ${file.name} (File size: ${Math.round(file.size / 1024)} KB). Contains professional CV layout credentials for candidate ${currentUser.name}. Experience in frontend technologies, fullstack, analysis, software development, cloud computing.`);
+        const candidateName = currentUser ? currentUser.name : (guestName || "Guest Candidate");
+        setUploadedCvContent(`[Uploaded ${file.name}] Raw file data extracted: ${file.name} (File size: ${Math.round(file.size / 1024)} KB). Contains professional CV layout credentials for candidate ${candidateName}. Experience in frontend technologies, fullstack, analysis, software development, cloud computing.`);
       }
     };
     
@@ -347,10 +410,21 @@ export default function App() {
     }
   };
 
-  // Submit internal application
+  // Submit internal/guest application (User can apply job without profile create)
   const handleApplySubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedJob) return;
+
+    const applicantName = currentUser ? currentUser.name : guestName.trim();
+    const applicantEmail = currentUser ? currentUser.email : guestEmail.trim();
+    const applicantRole = currentUser ? currentUser.currentRole : guestCurrentRole.trim();
+    const applicantId = currentUser ? currentUser.employeeId : (guestEmployeeId.trim() || `GUEST-${Math.floor(1000 + Math.random() * 9500)}`);
+
+    if (!applicantName || !applicantEmail) {
+      setApplyState(p => ({ ...p, error: "Please enter your Name and Email details to proceed." }));
+      return;
+    }
+
     if (!uploadedCvName) {
       setApplyState(p => ({ ...p, error: "Please upload your resume CV to proceed." }));
       return;
@@ -360,10 +434,10 @@ export default function App() {
 
     const payload = {
       jobId: selectedJob.id,
-      employeeName: currentUser.name,
-      employeeEmail: currentUser.email,
-      employeeId: currentUser.employeeId,
-      currentRole: currentUser.currentRole,
+      employeeName: applicantName,
+      employeeEmail: applicantEmail,
+      employeeId: applicantId,
+      currentRole: applicantRole || "Public Talent Prospect",
       cvName: uploadedCvName,
       cvContent: uploadedCvContent,
       documentName: uploadedDocName || "",
@@ -427,7 +501,7 @@ export default function App() {
 
   const filteredApps = getFilteredApps();
 
-  const unreadNotifCount = notifications.filter(n => !n.read).length;
+  const unreadNotifCount = currentUser ? notifications.filter(n => !n.read).length : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
@@ -443,117 +517,119 @@ export default function App() {
             </div>
             <div>
               <span className="text-base font-extrabold tracking-tight text-slate-800 font-display">APEX GROUP</span>
-              <span className="block text-[10px] font-bold uppercase tracking-widest text-sky-600 font-sans">Internal Career Portal</span>
+              <span className="block text-[10px] font-bold uppercase tracking-widest text-sky-600 font-sans">Global Career Gate</span>
             </div>
           </div>
 
-          {/* Persona Switchers & Notifications */}
+          {/* Notifications & Profile Controls */}
           <div className="flex items-center space-x-4">
-            
-            {/* Simulation Controller Tag */}
-            <div className="hidden items-center space-x-2 rounded-xl bg-slate-100 p-1 md:flex">
-              <span className="px-2 text-[10px] font-bold uppercase text-slate-400">Persona Swapper:</span>
-              {MOCK_EMPLOYEES.map((employee) => (
-                <button
-                  key={employee.email}
-                  onClick={() => handleRoleChange(employee.email)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold select-none transition-all ${
-                    currentUser.email === employee.email
-                      ? "bg-white text-slate-800 shadow-xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  {employee.name.split(" ")[0]} ({employee.role === "Admin" ? "Admin" : "Emp"})
-                </button>
-              ))}
-            </div>
-
-            {/* Mobile persona switcher dropdown */}
-            <div className="block md:hidden">
-              <select
-                value={currentUser.email}
-                onChange={(e) => handleRoleChange(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white p-1.5 text-xs font-semibold focus:outline-hidden"
-              >
-                {MOCK_EMPLOYEES.map((emp) => (
-                  <option key={emp.email} value={emp.email}>
-                    {emp.name.split(" ")[0]} ({emp.role})
-                  </option>
-                ))}
-              </select>
-            </div>
 
             {/* Notification triggers */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setIsNotificationPaneOpen(!isNotificationPaneOpen);
-                  if (!isNotificationPaneOpen) handleMarkAllRead();
-                }}
-                id="btn-notifications"
-                className="relative rounded-xl border border-slate-2 w-10 h-10 border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
-                title="Notifications panel"
-              >
-                <Bell className="h-5 w-5" />
-                {unreadNotifCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-extrabold text-white animate-bounce">
-                    {unreadNotifCount}
-                  </span>
-                )}
-              </button>
+            {currentUser && (
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setIsNotificationPaneOpen(!isNotificationPaneOpen);
+                    if (!isNotificationPaneOpen) handleMarkAllRead();
+                  }}
+                  id="btn-notifications"
+                  className="relative rounded-xl border border-slate-2 w-10 h-10 border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                  title="Notifications panel"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadNotifCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-extrabold text-white animate-bounce">
+                      {unreadNotifCount}
+                    </span>
+                  )}
+                </button>
 
-              {/* Live Alerts Overlay Drop Panel */}
-              {isNotificationPaneOpen && (
-                <div className="absolute right-0 mt-2.5 w-80 rounded-2xl border border-slate-200 bg-white p-0 shadow-xl z-55 overflow-hidden">
-                  <div className="flex items-center justify-between bg-slate-55 bg-slate-50 px-4 py-3 border-b border-slate-100">
-                    <h4 className="text-xs font-bold text-slate-700 font-display">Status Notifications ({notifications.length})</h4>
-                    {unreadNotifCount > 0 && (
-                      <span className="rounded-md bg-rose-50 px-1.5 py-0.5 text-[9px] font-extrabold text-rose-700 border border-rose-100">
-                        {unreadNotifCount} New
-                      </span>
-                    )}
-                  </div>
-                  <div className="max-h-72 overflow-y-auto p-2 space-y-1">
-                    {notifications.length === 0 ? (
-                      <div className="py-8 text-center text-xs text-slate-400">
-                        No notifications received.
-                      </div>
-                    ) : (
-                      notifications.map((notif) => (
-                        <div 
-                          key={notif.id} 
-                          className={`p-3 rounded-xl border transition-colors ${notif.read ? 'border-slate-50 bg-white' : 'border-sky-50 bg-sky-50/15'}`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <span className="text-[10px] font-bold uppercase text-sky-600">{notif.jobTitle}</span>
-                            <span className="text-[9px] text-slate-400">{new Date(notif.createdAt).toLocaleDateString()}</span>
-                          </div>
-                          <p className="mt-1 text-xs text-slate-600 leading-relaxed">{notif.message}</p>
+                {/* Live Alerts Overlay Drop Panel */}
+                {isNotificationPaneOpen && (
+                  <div className="absolute right-0 mt-2.5 w-80 rounded-2xl border border-slate-200 bg-white p-0 shadow-xl z-55 overflow-hidden">
+                    <div className="flex items-center justify-between bg-slate-55 bg-slate-50 px-4 py-3 border-b border-slate-100">
+                      <h4 className="text-xs font-bold text-slate-700 font-display">Status Notifications ({notifications.length})</h4>
+                      {unreadNotifCount > 0 && (
+                        <span className="rounded-md bg-rose-50 px-1.5 py-0.5 text-[9px] font-extrabold text-rose-700 border border-rose-100">
+                          {unreadNotifCount} New
+                        </span>
+                      )}
+                    </div>
+                    <div className="max-h-72 overflow-y-auto p-2 space-y-1">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-slate-400">
+                          No notifications received.
                         </div>
-                      ))
-                    )}
+                      ) : (
+                        notifications.map((notif) => (
+                          <div 
+                            key={notif.id} 
+                            className={`p-3 rounded-xl border transition-colors ${notif.read ? 'border-slate-50 bg-white' : 'border-sky-50 bg-sky-50/15'}`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <span className="text-[10px] font-bold uppercase text-sky-600">{notif.jobTitle}</span>
+                              <span className="text-[9px] text-slate-400">{new Date(notif.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-600 leading-relaxed">{notif.message}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="p-2 border-t border-slate-100 bg-slate-50/50 text-center">
+                      <button
+                        onClick={() => setIsNotificationPaneOpen(false)}
+                        className="text-[10px] font-bold text-slate-500 hover:text-slate-800"
+                      >
+                        Close Panel
+                      </button>
+                    </div>
                   </div>
-                  <div className="p-2 border-t border-slate-100 bg-slate-50/50 text-center">
-                    <button
-                      onClick={() => setIsNotificationPaneOpen(false)}
-                      className="text-[10px] font-bold text-slate-500 hover:text-slate-800"
-                    >
-                      Close Panel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Profile Avatar indicator */}
             <div className="flex items-center space-x-2 border-l border-slate-200 pl-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 font-serif font-bold font-sans">
-                {currentUser.name.charAt(0)}
-              </div>
-              <div className="hidden flex-col md:flex">
-                <span className="text-xs font-bold text-slate-700 leading-tight">{currentUser.name}</span>
-                <span className="text-[9px] text-slate-400 leading-none">{currentUser.currentRole}</span>
-              </div>
+              {currentUser ? (
+                <div className="flex items-center space-x-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-100 text-sky-700 font-bold font-sans text-xs">
+                    {currentUser.name.charAt(0)}
+                  </div>
+                  <div className="hidden flex-col md:flex mr-1">
+                    <span className="text-xs font-bold text-slate-700 leading-tight">{currentUser.name}</span>
+                    <span className="text-[9px] text-slate-400 leading-none mt-0.5">{currentUser.currentRole}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setCurrentUser(null);
+                      setIsNotificationPaneOpen(false);
+                      setSelectedApplication(null);
+                      setSelectedJob(null);
+                      setIsApplyDrawerOpen(false);
+                    }}
+                    className="inline-flex items-center space-x-1 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 px-2 py-1.5 text-xs font-semibold transition-all ml-1"
+                    title="Sign Out"
+                    id="btn-nav-logout"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Log Out</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      setLoginEmailInput("");
+                      setLoginError("");
+                      setIsLoginModalOpen(true);
+                    }}
+                    className="inline-flex items-center space-x-2 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white transition-all hover:bg-sky-700 active:scale-95 shadow-xs"
+                    id="btn-nav-login"
+                  >
+                    <span>Sign In</span>
+                  </button>
+                </div>
+              )}
             </div>
 
           </div>
@@ -566,16 +642,16 @@ export default function App() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-display sm:text-3xl">
-                {currentUser.role === "Admin" ? "Command Recruiting Center" : "Apex Group Intranet Career Gateway"}
+                {currentUser?.role === "Admin" ? "Command Recruiting Center" : "Apex Group Career Gateway"}
               </h1>
               <p className="mt-1.5 text-sm text-slate-550 max-w-2xl">
-                {currentUser.role === "Admin" 
+                {currentUser?.role === "Admin" 
                   ? "Track applications group-wide, analyze suitability matrices, configure pipeline changes, and run reporting audits."
-                  : "Submit internal applications, check current career openings category-wise across 4 companies, and track feedback."}
+                  : "Explore active holdings career opportunities group-wide, apply instantly without profile barriers, or sign in to track responses."}
               </p>
             </div>
 
-            {currentUser.role === "Admin" ? (
+            {currentUser?.role === "Admin" ? (
               <div className="flex flex-wrap items-center gap-2">
                 <a
                   href="/api/export"
@@ -594,7 +670,7 @@ export default function App() {
                   <span>Publish Job</span>
                 </button>
               </div>
-            ) : (
+            ) : currentUser?.role === "Employee" ? (
               <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4 py-3 flex items-center space-x-3 max-w-sm">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-150 bg-sky-100 text-sky-600">
                   <BookmarkCheck className="h-5 w-5" />
@@ -602,6 +678,25 @@ export default function App() {
                 <div>
                   <h4 className="text-xs font-bold text-slate-800">Internal Progression Program</h4>
                   <p className="text-[10px] text-slate-500 mt-0.5">Your Employee ID is: <b>{currentUser.employeeId}</b>. Submit CVs freely.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 py-3 flex items-center space-x-3 max-w-sm">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                  <UserSquare2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800">Browse Mode: Public Guest</h4>
+                  <button
+                    onClick={() => {
+                      setLoginEmailInput("");
+                      setLoginError("");
+                      setIsLoginModalOpen(true);
+                    }}
+                    className="text-[10px] font-extrabold text-sky-600 hover:text-sky-700 underline mt-0.5 block text-left"
+                  >
+                    Click to sign in as Admin / Employee
+                  </button>
                 </div>
               </div>
             )}
@@ -613,7 +708,7 @@ export default function App() {
       <main className="mx-auto max-w-7xl px-6 py-8">
         
         {/* ==================================== ADMIN WORKSPACE VIEW ==================================== */}
-        {currentUser.role === "Admin" && (
+        {currentUser?.role === "Admin" && (
           <div className="space-y-8">
             
             {/* Visual Stats Widgets */}
@@ -893,13 +988,11 @@ export default function App() {
                 </div>
               </section>
             )}
-
           </div>
         )}
 
-
-        {/* ==================================== EMPLOYEE VACANCIES BOARD ==================================== */}
-        {currentUser.role === "Employee" && (
+           {/* ==================================== EMPLOYEE & GUEST VACANCIES BOARD ==================================== */}
+        {(!currentUser || currentUser.role === "Employee") && (
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
             
             {/* Sidebar Filters */}
@@ -954,30 +1047,48 @@ export default function App() {
               </div>
 
               {/* My Submissions Track Area inside Sidebar */}
-              <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xs">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 font-sans">Applications Submitted ({applications.filter(a => a.employeeEmail === currentUser.email).length})</h4>
-                <div className="mt-3 space-y-3">
-                  {applications.filter(a => a.employeeEmail === currentUser.email).length === 0 ? (
-                    <p className="text-xs text-slate-450 leading-relaxed">No internal applications logged for your user profile yet.</p>
-                  ) : (
-                    applications.filter(a => a.employeeEmail === currentUser.email).map(app => (
-                      <div key={app.id} className="rounded-xl border border-slate-50 bg-slate-50/40 p-3 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-750 truncate tracking-tight">{app.jobTitle}</span>
-                          <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
-                            app.status === "Applied" ? "bg-blue-50 text-blue-700" :
-                            app.status === "Screening" ? "bg-indigo-50 text-indigo-700" :
-                            app.status === "Interviewing" ? "bg-amber-50 text-amber-700" :
-                            app.status === "Offered" ? "bg-emerald-50 text-emerald-700" :
-                            "bg-rose-50 text-rose-700"
-                          }`}>{app.status}</span>
+              {currentUser ? (
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xs">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 font-sans">Applications Submitted ({applications.filter(a => a.employeeEmail === currentUser.email).length})</h4>
+                  <div className="mt-3 space-y-3">
+                    {applications.filter(a => a.employeeEmail === currentUser.email).length === 0 ? (
+                      <p className="text-xs text-slate-450 leading-relaxed">No internal applications logged for your user profile yet.</p>
+                    ) : (
+                      applications.filter(a => a.employeeEmail === currentUser.email).map(app => (
+                        <div key={app.id} className="rounded-xl border border-slate-50 bg-slate-50/40 p-3 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-755 truncate tracking-tight">{app.jobTitle}</span>
+                            <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
+                              app.status === "Applied" ? "bg-blue-50 text-blue-700" :
+                              app.status === "Screening" ? "bg-indigo-50 text-indigo-700" :
+                              app.status === "Interviewing" ? "bg-amber-50 text-amber-700" :
+                              app.status === "Offered" ? "bg-emerald-50 text-emerald-700" :
+                              "bg-rose-50 text-rose-700"
+                            }`}>{app.status}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-405 mt-1">{app.companyName} • {new Date(app.appliedAt).toLocaleDateString()}</p>
                         </div>
-                        <p className="text-[10px] text-slate-405 mt-1">{app.companyName} • {new Date(app.appliedAt).toLocaleDateString()}</p>
-                      </div>
-                    ))
-                  )}
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-5 text-center shadow-xs">
+                  <BookmarkCheck className="mx-auto h-6 w-6 text-slate-350" />
+                  <h4 className="text-xs font-bold text-slate-700 mt-1.5">Track Your Submittals</h4>
+                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Currently browsing as external public guest. Sign in to monitor application states.</p>
+                  <button
+                    onClick={() => {
+                      setLoginEmailInput("");
+                      setLoginError("");
+                      setIsLoginModalOpen(true);
+                    }}
+                    className="mt-3 w-full rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 py-1.5 text-xs font-bold transition-all"
+                  >
+                    Authenticate Account
+                  </button>
+                </div>
+              )}
 
             </div>
 
@@ -1012,9 +1123,9 @@ export default function App() {
               ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
                   {filteredJobs.map((job) => {
-                    const candidateApplied = applications.some(
+                    const candidateApplied = currentUser ? applications.some(
                       app => app.jobId === job.id && app.employeeEmail.toLowerCase() === currentUser.email.toLowerCase()
-                    );
+                    ) : false;
                     return (
                       <JobCard
                         key={job.id}
@@ -1148,17 +1259,68 @@ export default function App() {
                   ) : (
                     <form onSubmit={handleApplySubmit} className="space-y-4 text-xs font-medium">
                       
-                      {/* Read only user display */}
-                      <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                        <div>
-                          <span className="text-slate-400 text-[10px]">Your Name:</span>
-                          <p className="text-slate-700 font-bold mt-0.5">{currentUser.name}</p>
+                      {/* User display or dynamic Guest inputs */}
+                      {currentUser ? (
+                        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                          <div>
+                            <span className="text-slate-400 text-[10px]">Your Name:</span>
+                            <p className="text-slate-700 font-bold mt-0.5">{currentUser.name}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 text-[10px]">Your Employee ID:</span>
+                            <p className="text-slate-700 font-bold mt-0.5">{currentUser.employeeId}</p>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-slate-400 text-[10px]">Your Employee ID:</span>
-                          <p className="text-slate-700 font-bold mt-0.5">{currentUser.employeeId}</p>
+                      ) : (
+                        <div className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-200">
+                          <p className="text-xs font-semibold text-slate-600 border-b border-slate-200 pb-1.5 uppercase tracking-wider">Applicant Basic Profile Details</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Full Name *</label>
+                              <input
+                                type="text"
+                                required
+                                value={guestName}
+                                onChange={(e) => setGuestName(e.target.value)}
+                                placeholder="Enter your full name"
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs focus:border-sky-500 focus:outline-hidden"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Email Address *</label>
+                              <input
+                                type="email"
+                                required
+                                value={guestEmail}
+                                onChange={(e) => setGuestEmail(e.target.value)}
+                                placeholder="name@example.com"
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs focus:border-sky-500 focus:outline-hidden"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Professional Role / Title *</label>
+                              <input
+                                type="text"
+                                required
+                                value={guestCurrentRole}
+                                onChange={(e) => setGuestCurrentRole(e.target.value)}
+                                placeholder="e.g. Software Engineer"
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs focus:border-sky-500 focus:outline-hidden"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Employee ID (Corporate / Optional)</label>
+                              <input
+                                type="text"
+                                value={guestEmployeeId}
+                                onChange={(e) => setGuestEmployeeId(e.target.value)}
+                                placeholder="e.g. EMP-9921 (Optional)"
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs focus:border-sky-500 focus:outline-hidden"
+                              />
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Cover letter Message */}
                       <div>
@@ -1223,7 +1385,7 @@ export default function App() {
                           id="btn-apply-submit"
                           className="inline-flex items-center space-x-1.5 rounded-xl bg-sky-600 px-6 py-2.5 text-xs font-bold text-white transition-all hover:bg-sky-700 active:scale-95 disabled:opacity-50"
                         >
-                          <span>{applyState.loading ? "Running AI matching..." : "Submit Internal Profile"}</span>
+                          <span>{applyState.loading ? "Running AI matching..." : currentUser ? "Submit Internal Profile" : "Submit Career Profile"}</span>
                           <ArrowRight className="h-4.5 w-4.5" />
                         </button>
                       </div>
@@ -1242,13 +1404,13 @@ export default function App() {
                 <button
                   onClick={() => {
                     // Check if candidate applied first
-                    const hasApplied = applications.some(
+                    const hasApplied = currentUser ? applications.some(
                       app => app.jobId === selectedJob.id && app.employeeEmail.toLowerCase() === currentUser.email.toLowerCase()
-                    );
+                    ) : false;
                     if (hasApplied) {
-                      alert("You have already applied internally for this posting.");
+                      alert("You have already applied for this posting.");
                     } else if (selectedJob.status === "Closed") {
-                      alert("This vacancy is temporarily closed to internal candidates.");
+                      alert("This vacancy is temporarily closed to candidates.");
                     } else {
                       setIsApplyDrawerOpen(true);
                     }
@@ -1256,7 +1418,7 @@ export default function App() {
                   id="btn-switch-apply"
                   className="inline-flex items-center space-x-1 rounded-xl bg-sky-600 px-5 py-2 text-xs font-bold text-white transition-all hover:bg-sky-700 active:scale-95"
                 >
-                  <span>Apply Internally Now</span>
+                  <span>{currentUser ? "Apply Internally Now" : "Apply to Job Position"}</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -1288,6 +1450,69 @@ export default function App() {
           onStatusChange={handleStatusChange}
           onSaveNotes={handleSaveNotes}
         />
+      )}
+
+
+      {/* ==================================== MODAL: SIGN IN DIALOG ==================================== */}
+      {isLoginModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 overflow-hidden flex flex-col space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
+                  <UserSquare2 className="h-4.5 w-4.5" />
+                </div>
+                <h3 className="text-sm font-extrabold text-slate-800 font-display">Apex Portal Authentication</h3>
+              </div>
+              <button
+                onClick={() => setIsLoginModalOpen(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                id="btn-close-login"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed font-sans">
+              Enter your email address to sign in. The admin dashboard can be accessed by matching the designated administrator email: <code className="bg-sky-50 text-sky-700 px-1 py-0.5 rounded-md font-mono text-[10px] font-bold">only administration mail can access admin dashboard</code>.
+            </p>
+
+            {loginError && (
+              <div className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-100">
+                {loginError}
+              </div>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleLoginSubmit(loginEmailInput);
+              }}
+              className="space-y-3.5"
+            >
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Corporate / Personal Email *</label>
+                <input
+                  type="email"
+                  required
+                  value={loginEmailInput}
+                  onChange={(e) => setLoginEmailInput(e.target.value)}
+                  placeholder="e.g. your.mail@gmail.com"
+                  className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:border-sky-500 focus:outline-hidden"
+                  id="login-email-input"
+                />
+              </div>
+
+              <button
+                type="submit"
+                id="btn-login-submit"
+                className="w-full rounded-xl bg-sky-600 py-2.5 text-xs font-bold text-white transition-all hover:bg-sky-700 active:scale-95"
+              >
+                Authenticate Profile
+              </button>
+            </form>
+          </div>
+        </div>
       )}
 
     </div>
