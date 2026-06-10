@@ -55,11 +55,11 @@
       "title": "Corporate Talent Acquisition Specialist",
       "category": "Human Resources",
       "department": "Strategic HR",
-      "companyName": "Apex Group HQ",
+      "companyName": "Rangpur Group HQ",
       "location": "Dhaka, Bangladesh (On-site)",
       "type": "Full-Time",
       "salaryRange": "৳70,000 - ৳85,000 / month",
-      "description": "Join our Strategic HR cell at Apex Group Headquarters. You will drive group-wide internal hiring, design professional onboarding flows, and run employer branding and employee engagement programs.",
+      "description": "Join our Strategic HR cell at Rangpur Group Headquarters. You will drive group-wide internal hiring, design professional onboarding flows, and run employer branding and employee engagement programs.",
       "requirements": [
         "BBA/MBA in Human Resource Management (HRM).",
         "Minimum 2 years of corporate recruiting experience (technical recruiting is a plus).",
@@ -103,7 +103,7 @@
     {
       "id": "job-5",
       "title": "Logistics & Supply Chain Lead",
-      "category": "Engineering & Operations",
+      "category": "Engineering & Operation",
       "department": "Asset management",
       "companyName": "Apex Logistics",
       "location": "Chittagong Port Terminal (On-site)",
@@ -149,14 +149,14 @@
       "id": "app-2",
       "jobId": "job-3",
       "jobTitle": "Corporate Talent Acquisition Specialist",
-      "companyName": "Apex Group HQ",
+      "companyName": "Rangpur Group HQ",
       "employeeName": "Nusrat Jahan",
       "employeeEmail": "nusrat.hr@apex-digital.com",
       "employeeId": "EMP-3841",
       "currentRole": "HR Assistant",
       "cvName": "nusrat_jahan_hr_resume.txt",
       "cvContent": "Nusrat Jahan\nEmail: nusrat.hr@apex-digital.com\nSkills: Recruiting, employee relations, onboarding, ATS systems\nExperience: 1.5 Years as HR Assistant in Apex Digital.",
-      "coverLetter": "I have been supporting strategic recruitment events over the last 12 months. This TA role aligns perfectly with my professional goals of orchestrating Apex Group's national hiring plans.",
+      "coverLetter": "I have been supporting strategic recruitment events over the last 12 months. This TA role aligns perfectly with my professional goals of orchestrating Rangpur Group's national hiring plans.",
       "status": "Applied",
       "appliedAt": "2026-06-09T11:40:00Z",
       "adminNotes": "Initial screening looks promising. Good communication skills noted by her current director.",
@@ -172,7 +172,16 @@
       "message": "Your application for Senior React Developer has been moved to 'Screening'.",
       "status": "Screening",
       "createdAt": "2026-06-08T10:00:00Z",
-      "read": false
+      "read": true
     }
+  ],
+  "categories": [
+    "Technology & IT",
+    "Finance & Accounts",
+    "Human Resources",
+    "Design & Creatives",
+    "Engineering & Operation",
+    "Marketing & Corporate Sales",
+    "MBBS Lecturer"
   ]
 }

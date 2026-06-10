@@ -6,9 +6,11 @@ interface JobPublishFormProps {
   onClose: () => void;
   onPublish: (jobData: any) => Promise<void>;
   initialJob?: JobPost | null;
+  categories?: string[];
+  companies?: string[];
 }
 
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   "Technology & IT",
   "Finance & Accounts",
   "Human Resources",
@@ -17,18 +19,24 @@ const CATEGORIES = [
   "Marketing & Corporate Sales"
 ];
 
-const COMPONENT_ENTITIES = [
-  "Apex Digital",
-  "Apex Capital",
-  "Apex Healthcare",
-  "Apex Logistics",
-  "Apex Group HQ"
+const DEFAULT_COMPANIES = [
+  "Rangpur Digital",
+  "Rangpur Capital",
+  "Rangpur Healthcare",
+  "Rangpur Logistics",
+  "Rangpur Group HQ"
 ];
 
-export default function JobPublishForm({ onClose, onPublish, initialJob }: JobPublishFormProps) {
+export default function JobPublishForm({ 
+  onClose, 
+  onPublish, 
+  initialJob, 
+  categories = DEFAULT_CATEGORIES,
+  companies = DEFAULT_COMPANIES
+}: JobPublishFormProps) {
   const [title, setTitle] = useState(initialJob ? initialJob.title : "");
-  const [companyName, setCompanyName] = useState(initialJob ? initialJob.companyName : COMPONENT_ENTITIES[0]);
-  const [category, setCategory] = useState(initialJob ? initialJob.category : CATEGORIES[0]);
+  const [companyName, setCompanyName] = useState(initialJob ? initialJob.companyName : (companies[0] || "Rangpur Group HQ"));
+  const [category, setCategory] = useState(initialJob ? initialJob.category : (categories[0] || "General"));
   const [department, setDepartment] = useState(initialJob ? initialJob.department : "");
   const [location, setLocation] = useState(initialJob ? initialJob.location : "");
   const [type, setType] = useState<JobType>(initialJob ? initialJob.type : "Full-Time");
@@ -158,7 +166,7 @@ export default function JobPublishForm({ onClose, onPublish, initialJob }: JobPu
                 onChange={(e) => setCompanyName(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-sm focus:border-sky-500 focus:outline-hidden bg-white"
               >
-                {COMPONENT_ENTITIES.map((name) => (
+                {companies.map((name) => (
                   <option key={name} value={name}>{name}</option>
                 ))}
               </select>
@@ -172,7 +180,7 @@ export default function JobPublishForm({ onClose, onPublish, initialJob }: JobPu
                 onChange={(e) => setCategory(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-sm focus:border-sky-500 focus:outline-hidden bg-white"
               >
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>

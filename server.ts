@@ -17,15 +17,44 @@ app.use(express.urlencoded({ limit: "15mb", extended: true }));
 
 // Helper to safely read database
 async function readDB() {
+  const defaultCategories = [
+    "Technology & IT",
+    "Finance & Accounts",
+    "Human Resources",
+    "Design & Creatives",
+    "Engineering & Operations",
+    "Marketing & Corporate Sales"
+  ];
+  const defaultCompanies = [
+    "Rangpur Digital",
+    "Rangpur Capital",
+    "Rangpur Healthcare",
+    "Rangpur Logistics",
+    "Rangpur Group HQ"
+  ];
+
   try {
     if (!fs.existsSync(DB_FILE)) {
-      return { jobs: [], applications: [], notifications: [] };
+      return { jobs: [], applications: [], notifications: [], categories: defaultCategories, companies: defaultCompanies };
     }
     const data = await fs.promises.readFile(DB_FILE, "utf-8");
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    if (!parsed.categories || !Array.isArray(parsed.categories)) {
+      parsed.categories = defaultCategories;
+    }
+    if (!parsed.companies || !Array.isArray(parsed.companies)) {
+      parsed.companies = defaultCompanies;
+    }
+    return parsed;
   } catch (err) {
     console.error("Database reading error, starting empty:", err);
-    return { jobs: [], applications: [], notifications: [] };
+    return {
+      jobs: [],
+      applications: [],
+      notifications: [],
+      categories: defaultCategories,
+      companies: defaultCompanies
+    };
   }
 }
 
@@ -210,6 +239,168 @@ app.delete("/api/jobs/:id", async (req, res) => {
   res.json({ success: true, message: "Job deleted successfully." });
 });
 
+// === CATEGORIES ENDPOINTS ===
+
+// GET list of categories
+app.get("/api/categories", async (req, res) => {
+  const db = await readDB();
+  res.json(db.categories || []);
+});
+
+// Create new category
+app.post("/api/categories", async (req, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== "string" || !name.trim()) {
+    return res.status(400).json({ error: "Category name is required" });
+  }
+  const db = await readDB();
+  const cleanName = name.trim();
+  if (db.categories.some((c: string) => c.toLowerCase() === cleanName.toLowerCase())) {
+    return res.status(400).json({ error: "Category already exists" });
+  }
+  db.categories.push(cleanName);
+  await writeDB(db);
+  res.status(201).json({ success: true, categories: db.categories });
+});
+
+// Rename category
+app.put("/api/categories", async (req, res) => {
+  const { oldName, newName } = req.body;
+  if (!oldName || !newName || typeof oldName !== "string" || typeof newName !== "string") {
+    return res.status(400).json({ error: "Both old name and new name are required" });
+  }
+  const db = await readDB();
+  const cleanOld = oldName.trim();
+  const cleanNew = newName.trim();
+  const index = db.categories.findIndex((c: string) => c.toLowerCase() === cleanOld.toLowerCase());
+  if (index === -1) {
+    return res.status(404).json({ error: "Category not found to rename" });
+  }
+  db.categories[index] = cleanNew;
+  
+  // Update in all jobs
+  if (db.jobs && Array.isArray(db.jobs)) {
+    db.jobs.forEach((j: any) => {
+      if (j.category === cleanOld) {
+        j.category = cleanNew;
+      }
+    });
+  }
+  await writeDB(db);
+  res.json({ success: true, categories: db.categories });
+});
+
+// Delete category
+app.delete("/api/categories", async (req, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== "string") {
+    return res.status(400).json({ error: "Category name is required" });
+  }
+  const db = await readDB();
+  const cleanName = name.trim();
+  const index = db.categories.findIndex((c: string) => c.toLowerCase() === cleanName.toLowerCase());
+  if (index === -1) {
+    return res.status(404).json({ error: "Category not found" });
+  }
+  
+  // Remove category from list
+  db.categories.splice(index, 1);
+  
+  // Reassign any jobs that belong to this category to a remaining category or "General"
+  const fallbackCategory = db.categories[0] || "General";
+  if (db.jobs && Array.isArray(db.jobs)) {
+    db.jobs.forEach((j: any) => {
+      if (j.category === cleanName) {
+        j.category = fallbackCategory;
+      }
+    });
+  }
+  
+  await writeDB(db);
+  res.json({ success: true, categories: db.categories });
+});
+
+// === COMPANIES (GROUP ENTITIES) ENDPOINTS ===
+
+// GET list of companies
+app.get("/api/companies", async (req, res) => {
+  const db = await readDB();
+  res.json(db.companies || []);
+});
+
+// Create new company
+app.post("/api/companies", async (req, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== "string" || !name.trim()) {
+    return res.status(400).json({ error: "Company name is required" });
+  }
+  const db = await readDB();
+  const cleanName = name.trim();
+  if (db.companies.some((c: string) => c.toLowerCase() === cleanName.toLowerCase())) {
+    return res.status(400).json({ error: "Company already exists" });
+  }
+  db.companies.push(cleanName);
+  await writeDB(db);
+  res.status(201).json({ success: true, companies: db.companies });
+});
+
+// Rename company
+app.put("/api/companies", async (req, res) => {
+  const { oldName, newName } = req.body;
+  if (!oldName || !newName || typeof oldName !== "string" || typeof newName !== "string") {
+    return res.status(400).json({ error: "Both old name and new name are required" });
+  }
+  const db = await readDB();
+  const cleanOld = oldName.trim();
+  const cleanNew = newName.trim();
+  const index = db.companies.findIndex((c: string) => c.toLowerCase() === cleanOld.toLowerCase());
+  if (index === -1) {
+    return res.status(404).json({ error: "Company not found to rename" });
+  }
+  db.companies[index] = cleanNew;
+  
+  // Update in all jobs
+  if (db.jobs && Array.isArray(db.jobs)) {
+    db.jobs.forEach((j: any) => {
+      if (j.companyName === cleanOld) {
+        j.companyName = cleanNew;
+      }
+    });
+  }
+  await writeDB(db);
+  res.json({ success: true, companies: db.companies });
+});
+
+// Delete company
+app.delete("/api/companies", async (req, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== "string") {
+    return res.status(400).json({ error: "Company name is required" });
+  }
+  const db = await readDB();
+  const cleanName = name.trim();
+  const index = db.companies.findIndex((c: string) => c.toLowerCase() === cleanName.toLowerCase());
+  if (index === -1) {
+    return res.status(404).json({ error: "Company not found" });
+  }
+  
+  // Remove company from list
+  db.companies.splice(index, 1);
+  
+  // Reassign any jobs that belong to this company to a remaining company or a default fallback
+  const fallbackCompany = db.companies[0] || "Rangpur Group HQ";
+  if (db.jobs && Array.isArray(db.jobs)) {
+    db.jobs.forEach((j: any) => {
+      if (j.companyName === cleanName) {
+        j.companyName = fallbackCompany;
+      }
+    });
+  }
+  
+  await writeDB(db);
+  res.json({ success: true, companies: db.companies });
+});
+
 // 5. Applications List
 app.get("/api/applications", async (req, res) => {
   const db = await readDB();
@@ -274,7 +465,7 @@ app.get("/api/applications/stats", async (req, res) => {
 
 // 7. Apply Internally (Submit application with automatic resume parsing & evaluator)
 app.post("/api/applications", async (req, res) => {
-  const { jobId, employeeName, employeeEmail, employeeId, currentRole, cvName, cvContent, documentName, coverLetter } = req.body;
+  const { jobId, employeeName, employeeEmail, employeeId, currentRole, cvName, cvContent, documentName, coverLetter, documents } = req.body;
 
   if (!jobId || !employeeName || !employeeEmail || !employeeId) {
     return res.status(400).json({ error: "Missing candidate credentials" });
@@ -311,6 +502,7 @@ app.post("/api/applications", async (req, res) => {
     cvContent: cvContent || "",
     documentName: documentName || "",
     coverLetter: coverLetter || "",
+    documents: documents || [],
     status: "Applied",
     appliedAt: new Date().toISOString(),
     adminNotes: "",

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, DragEvent, ChangeEvent, FormEvent } from "react";
-import { JobPost, Application, Notification, User, ApplicationStatus } from "./types";
+import { JobPost, Application, Notification, User, ApplicationStatus, UploadedDocument } from "./types";
 import { 
   Briefcase, 
   Users, 
@@ -33,25 +33,6 @@ import DashboardStats from "./components/DashboardStats";
 import JobCard from "./components/JobCard";
 import ApplicationDetailsModal from "./components/ApplicationDetailsModal";
 import JobPublishForm from "./components/JobPublishForm";
-
-const CATEGORIES = [
-  "All Categories",
-  "Technology & IT",
-  "Finance & Accounts",
-  "Human Resources",
-  "Design & Creatives",
-  "Engineering & Operations",
-  "Marketing & Corporate Sales"
-];
-
-const GROUP_COMPANIES = [
-  "All Entities",
-  "Apex Digital",
-  "Apex Capital",
-  "Apex Healthcare",
-  "Apex Logistics",
-  "Apex Group HQ"
-];
 
 // Presets for simulated internal employees
 const MOCK_EMPLOYEES: User[] = [
@@ -104,10 +85,201 @@ export default function App() {
 
   // New Job Publishers status
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
-  // Admin selected tab ("applications" | "jobs")
-  const [adminTab, setAdminTab] = useState<"applications" | "jobs">("applications");
+  // Admin selected tab ("applications" | "jobs" | "categories" | "companies")
+  const [adminTab, setAdminTab] = useState<"applications" | "jobs" | "categories" | "companies">("applications");
   // Editing Job state
   const [editingJob, setEditingJob] = useState<JobPost | null>(null);
+
+  // Categories CRUD and state management
+  const [categories, setCategories] = useState<string[]>([
+    "Technology & IT",
+    "Finance & Accounts",
+    "Human Resources",
+    "Design & Creatives",
+    "Engineering & Operations",
+    "Marketing & Corporate Sales"
+  ]);
+  const [newCatInput, setNewCatInput] = useState("");
+  const [renamingCat, setRenamingCat] = useState<string | null>(null);
+  const [renameInput, setRenameInput] = useState("");
+  const [catError, setCatError] = useState("");
+  const [catSuccess, setCatSuccess] = useState("");
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCatError("");
+    setCatSuccess("");
+    if (!newCatInput.trim()) return;
+
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCatInput.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCategories(data.categories);
+        setNewCatInput("");
+        setCatSuccess("Sector category successfully created!");
+        fetchAppsAndStats();
+      } else {
+        setCatError(data.error || "Failed to create category");
+      }
+    } catch (err) {
+      console.error(err);
+      setCatError("Failed to communicate with Server.");
+    }
+  };
+
+  const handleRenameCategory = async (oldName: string) => {
+    setCatError("");
+    setCatSuccess("");
+    if (!renameInput.trim() || renameInput.trim() === oldName) {
+      setRenamingCat(null);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/categories", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldName, newName: renameInput.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCategories(data.categories);
+        setRenamingCat(null);
+        setRenameInput("");
+        setCatSuccess("Sector category successfully renamed!");
+        fetchAllData();
+      } else {
+        setCatError(data.error || "Failed to rename category");
+      }
+    } catch (err) {
+      console.error(err);
+      setCatError("Failed to communicate with Server.");
+    }
+  };
+
+  const handleDeleteCategory = async (name: string) => {
+    setCatError("");
+    setCatSuccess("");
+
+    try {
+      const res = await fetch("/api/categories", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCategories(data.categories);
+        setCatSuccess("Sector category deleted entirely. Connected jobs were safely reassigned.");
+        fetchAllData();
+      } else {
+        setCatError(data.error || "Failed to delete category");
+      }
+    } catch (err) {
+      console.error(err);
+      setCatError("Failed to communicate with Server.");
+    }
+  };
+
+  // Companies (Group Entities) CRUD and state management
+  const [companies, setCompanies] = useState<string[]>([
+    "Rangpur Digital",
+    "Rangpur Capital",
+    "Rangpur Healthcare",
+    "Rangpur Logistics",
+    "Rangpur Group HQ"
+  ]);
+  const [newCompanyInput, setNewCompanyInput] = useState("");
+  const [renamingCompany, setRenamingCompany] = useState<string | null>(null);
+  const [renameCompanyInput, setRenameCompanyInput] = useState("");
+  const [companyError, setCompanyError] = useState("");
+  const [companySuccess, setCompanySuccess] = useState("");
+
+  const handleCreateCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCompanyError("");
+    setCompanySuccess("");
+    if (!newCompanyInput.trim()) return;
+
+    try {
+      const res = await fetch("/api/companies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCompanyInput.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCompanies(data.companies);
+        setNewCompanyInput("");
+        setCompanySuccess("Group entity successfully created!");
+        fetchAllData();
+      } else {
+        setCompanyError(data.error || "Failed to create entity");
+      }
+    } catch (err) {
+      console.error(err);
+      setCompanyError("Failed to communicate with Server.");
+    }
+  };
+
+  const handleRenameCompany = async (oldName: string) => {
+    setCompanyError("");
+    setCompanySuccess("");
+    if (!renameCompanyInput.trim() || renameCompanyInput.trim() === oldName) {
+      setRenamingCompany(null);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/companies", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldName, newName: renameCompanyInput.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCompanies(data.companies);
+        setRenamingCompany(null);
+        setRenameCompanyInput("");
+        setCompanySuccess("Group entity successfully renamed!");
+        fetchAllData();
+      } else {
+        setCompanyError(data.error || "Failed to rename entity");
+      }
+    } catch (err) {
+      console.error(err);
+      setCompanyError("Failed to communicate with Server.");
+    }
+  };
+
+  const handleDeleteCompany = async (name: string) => {
+    setCompanyError("");
+    setCompanySuccess("");
+
+    try {
+      const res = await fetch("/api/companies", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCompanies(data.companies);
+        setCompanySuccess("Group entity deleted entirely. Connected jobs were reassigned gracefully.");
+        fetchAllData();
+      } else {
+        setCompanyError(data.error || "Failed to delete entity");
+      }
+    } catch (err) {
+      console.error(err);
+      setCompanyError("Failed to communicate with Server.");
+    }
+  };
 
   // Notification Pane drop-box state
   const [isNotificationPaneOpen, setIsNotificationPaneOpen] = useState(false);
@@ -128,6 +300,9 @@ export default function App() {
   const [uploadedCvName, setUploadedCvName] = useState("");
   const [uploadedCvContent, setUploadedCvContent] = useState("");
   const [uploadedDocName, setUploadedDocName] = useState("");
+  const [attachedDocuments, setAttachedDocuments] = useState<UploadedDocument[]>([]);
+  const [selectedDocType, setSelectedDocType] = useState("Academic Transcript");
+  const [extraFileError, setExtraFileError] = useState("");
   
   const [dragOver, setDragOver] = useState(false);
   const [applyState, setApplyState] = useState<{ loading: boolean; error: string; success: boolean }>({
@@ -139,11 +314,13 @@ export default function App() {
   // Load backend variables
   const fetchAllData = async () => {
     try {
-      const [jobsRes, appsRes, notifsRes, statsRes] = await Promise.all([
+      const [jobsRes, appsRes, notifsRes, statsRes, catsRes, compsRes] = await Promise.all([
         fetch("/api/jobs"),
         fetch("/api/applications"),
         currentUser ? fetch(`/api/notifications?email=${currentUser.email}`) : Promise.resolve(null),
-        fetch("/api/applications/stats")
+        fetch("/api/applications/stats"),
+        fetch("/api/categories"),
+        fetch("/api/companies")
       ]);
 
       if (jobsRes.ok) setJobs(await jobsRes.json());
@@ -154,6 +331,8 @@ export default function App() {
         setNotifications([]);
       }
       if (statsRes.ok) setDashboardStats(await statsRes.json());
+      if (catsRes.ok) setCategories(await catsRes.json());
+      if (compsRes.ok) setCompanies(await compsRes.json());
     } catch (e) {
       console.error("Error communicating with Node backend:", e);
     }
@@ -408,6 +587,70 @@ export default function App() {
     } else {
       reader.readAsDataURL(file); // Encode binary to support pdf/doc summaries
     }
+
+    // Also read as Data URL for download preservation
+    const downloadReader = new FileReader();
+    downloadReader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setAttachedDocuments(prev => {
+        const filtered = prev.filter(d => d.type !== "CV/Resume");
+        return [
+          {
+            id: `doc-cv-${Date.now()}`,
+            name: file.name,
+            type: "CV/Resume",
+            content: dataUrl,
+            fileType: file.type || "application/octet-stream",
+            size: file.size
+          },
+          ...filtered
+        ];
+      });
+    };
+    downloadReader.readAsDataURL(file);
+  };
+
+  const handleAddExtraDocument = (e: ChangeEvent<HTMLInputElement>) => {
+    setExtraFileError("");
+    const file = e.target?.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setExtraFileError("File is too large. Maximum size allowed is 10MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      const newDoc: UploadedDocument = {
+        id: `doc-extra-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        name: file.name,
+        type: selectedDocType,
+        content: dataUrl,
+        fileType: file.type || "application/octet-stream",
+        size: file.size
+      };
+      setAttachedDocuments(prev => {
+        // Evit duplicate ids/files
+        const filtered = prev.filter(d => d.name !== file.name || d.type !== selectedDocType);
+        return [...filtered, newDoc];
+      });
+    };
+    reader.readAsDataURL(file);
+    // Reset file input value
+    e.target.value = "";
+  };
+
+  const handleRemoveExtraDocument = (id: string) => {
+    setAttachedDocuments(prev => {
+      const removed = prev.find(d => d.id === id);
+      if (removed && removed.type === "CV/Resume") {
+        setUploadedCvName("");
+        setUploadedCvContent("");
+      }
+      return prev.filter(doc => doc.id !== id);
+    });
   };
 
   // Submit internal/guest application (User can apply job without profile create)
@@ -441,7 +684,8 @@ export default function App() {
       cvName: uploadedCvName,
       cvContent: uploadedCvContent,
       documentName: uploadedDocName || "",
-      coverLetter: coverLetter.trim()
+      coverLetter: coverLetter.trim(),
+      documents: attachedDocuments
     };
 
     try {
@@ -470,6 +714,7 @@ export default function App() {
         setUploadedCvName("");
         setUploadedCvContent("");
         setUploadedDocName("");
+        setAttachedDocuments([]);
         setApplyState(p => ({ ...p, success: false }));
       }, 2500);
 
@@ -512,11 +757,11 @@ export default function App() {
           
           {/* Logo Name */}
           <div className="flex items-center space-x-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600 font-display text-lg font-bold text-white shadow-xs">
-              A
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600 font-display text-lg font-bold text-white shadow-xs font-display">
+              R
             </div>
             <div>
-              <span className="text-base font-extrabold tracking-tight text-slate-800 font-display">APEX GROUP</span>
+              <span className="text-base font-extrabold tracking-tight text-slate-800 font-display">RANGPUR GROUP</span>
               <span className="block text-[10px] font-bold uppercase tracking-widest text-sky-600 font-sans">Global Career Gate</span>
             </div>
           </div>
@@ -642,7 +887,7 @@ export default function App() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-display sm:text-3xl">
-                {currentUser?.role === "Admin" ? "Command Recruiting Center" : "Apex Group Career Gateway"}
+                {currentUser?.role === "Admin" ? "Command Recruiting Center" : "Rangpur Group Career Gateway"}
               </h1>
               <p className="mt-1.5 text-sm text-slate-550 max-w-2xl">
                 {currentUser?.role === "Admin" 
@@ -740,6 +985,30 @@ export default function App() {
               >
                 <Briefcase className="h-4 w-4" />
                 <span>Job Vacancies Center ({jobs.length})</span>
+              </button>
+              <button
+                onClick={() => setAdminTab("categories")}
+                id="btn-admin-categories-tab"
+                className={`py-3 px-6 text-sm font-bold border-b-2 transition-all flex items-center space-x-2 ${
+                  adminTab === "categories"
+                    ? "border-sky-600 text-sky-600 font-bold"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Filter className="h-4 w-4" />
+                <span>Sector Categories ({categories.length})</span>
+              </button>
+              <button
+                onClick={() => setAdminTab("companies")}
+                id="btn-admin-companies-tab"
+                className={`py-3 px-6 text-sm font-bold border-b-2 transition-all flex items-center space-x-2 ${
+                  adminTab === "companies"
+                    ? "border-sky-600 text-sky-600 font-bold"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Building className="h-4 w-4" />
+                <span>Group Entities ({companies.length})</span>
               </button>
             </div>
 
@@ -880,7 +1149,7 @@ export default function App() {
               <section className="space-y-4 font-sans">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-800 font-display">Apex Group Active Vacancy Center</h2>
+                    <h2 className="text-lg font-bold text-slate-800 font-display">Rangpur Group Active Vacancy Center</h2>
                     <p className="text-xs text-slate-400">Manage, update status, and audit active/closed career positions group-wide.</p>
                   </div>
                   <button
@@ -988,6 +1257,248 @@ export default function App() {
                 </div>
               </section>
             )}
+
+            {/* Sector Categories Maintenance Section */}
+            {adminTab === "categories" && (
+              <section className="space-y-4 font-sans max-w-4xl">
+                <div>
+                  <h2 className="text-base font-bold text-slate-800 font-display">Manage & Maintain Sector Categories</h2>
+                  <p className="text-xs text-slate-400">Add, rename, and clean up job categories used across the career gateway.</p>
+                </div>
+
+                {catError && (
+                  <div className="rounded-xl bg-rose-50 p-3.5 text-xs font-semibold text-rose-700 border border-rose-100">
+                    {catError}
+                  </div>
+                )}
+                {catSuccess && (
+                  <div className="rounded-xl bg-emerald-50 p-3.5 text-xs font-semibold text-emerald-700 border border-emerald-100">
+                    {catSuccess}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Category Creation Card */}
+                  <div className="md:col-span-1 rounded-2xl border border-slate-100 bg-white p-5 shadow-xs h-fit">
+                    <h3 className="text-xs font-bold text-slate-800 font-display mb-3">Create New Category</h3>
+                    <form onSubmit={handleCreateCategory} className="space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Category Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={newCatInput}
+                          onChange={(e) => setNewCatInput(e.target.value)}
+                          placeholder="e.g. Legal & Compliance"
+                          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:border-sky-500 focus:outline-hidden"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full inline-flex items-center justify-center space-x-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-700 active:scale-95 transition-all text-center"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Add Category</span>
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Active Categories List */}
+                  <div className="md:col-span-2 rounded-2xl border border-slate-100 bg-white overflow-hidden shadow-xs">
+                    <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
+                      <span className="text-xs font-bold text-slate-850 uppercase tracking-wider font-sans">Active Categories List</span>
+                    </div>
+                    {categories.length === 0 ? (
+                      <div className="py-12 text-center text-sm text-slate-400">
+                        <p className="text-xs">No sector categories defined in database yet.</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {categories.map((cat) => {
+                          const isInUse = jobs.some(j => j.category === cat);
+                          const isEditing = renamingCat === cat;
+                          return (
+                            <div key={cat} className="px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-55/40 hover:bg-slate-50/50 transition-colors">
+                              {isEditing ? (
+                                <div className="flex-1 flex items-center space-x-2">
+                                  <input
+                                    type="text"
+                                    value={renameInput}
+                                    onChange={(e) => setRenameInput(e.target.value)}
+                                    className="flex-1 rounded-xl border border-slate-200 p-2 text-xs focus:border-sky-500 focus:outline-hidden"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleRenameCategory(cat)}
+                                    className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-[11px] font-bold text-white transition-colors"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => setRenamingCat(null)}
+                                    className="rounded-lg bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-600 transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <div>
+                                    <div className="font-bold text-slate-800 text-sm">{cat}</div>
+                                    <div className="text-[10px] text-slate-400 mt-1">
+                                      {isInUse ? "Linked to active postings (will default to fallback if deleted)" : "Unused category (safe to delete)"}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2 self-end sm:self-auto">
+                                    <button
+                                      onClick={() => {
+                                        setRenamingCat(cat);
+                                        setRenameInput(cat);
+                                      }}
+                                      className="inline-flex items-center space-x-1 rounded-lg bg-slate-100 hover:bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 transition-colors"
+                                    >
+                                      Rename
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteCategory(cat)}
+                                      className="inline-flex items-center justify-center rounded-lg p-1.5 transition-colors bg-rose-50 hover:bg-rose-100 text-rose-600"
+                                      title={isInUse ? "Delete category (Associated jobs will fallback gracefully)" : "Delete category"}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Group Entities Maintenance Section */}
+            {adminTab === "companies" && (
+              <section className="space-y-4 font-sans max-w-4xl">
+                <div>
+                  <h2 className="text-base font-bold text-slate-800 font-display">Manage & Maintain Group Entities</h2>
+                  <p className="text-xs text-slate-400">Add corporate divisions, rename existing companies, and update assignments group-wide.</p>
+                </div>
+
+                {companyError && (
+                  <div className="rounded-xl bg-rose-50 p-3.5 text-xs font-semibold text-rose-700 border border-rose-100">
+                    {companyError}
+                  </div>
+                )}
+                {companySuccess && (
+                  <div className="rounded-xl bg-emerald-50 p-3.5 text-xs font-semibold text-emerald-700 border border-emerald-100">
+                    {companySuccess}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Entity Creation Card */}
+                  <div className="md:col-span-1 rounded-2xl border border-slate-100 bg-white p-5 shadow-xs h-fit">
+                    <h3 className="text-xs font-bold text-slate-800 font-display mb-3">Create New Entity</h3>
+                    <form onSubmit={handleCreateCompany} className="space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Entity Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={newCompanyInput}
+                          onChange={(e) => setNewCompanyInput(e.target.value)}
+                          placeholder="e.g. Rangpur Textiles"
+                          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:border-sky-500 focus:outline-hidden text-slate-800 bg-white"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full inline-flex items-center justify-center space-x-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-700 active:scale-95 transition-all text-center cursor-pointer"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Add Entity</span>
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Active Entities List */}
+                  <div className="md:col-span-2 rounded-2xl border border-slate-100 bg-white overflow-hidden shadow-xs">
+                    <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
+                      <span className="text-xs font-bold text-slate-850 uppercase tracking-wider font-sans">Active Group Entities</span>
+                    </div>
+                    {companies.length === 0 ? (
+                      <div className="py-12 text-center text-sm text-slate-400">
+                        <p className="text-xs">No corporate entities defined in database yet.</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {companies.map((comp) => {
+                          const isInUse = jobs.some(j => j.companyName === comp);
+                          const isEditing = renamingCompany === comp;
+                          return (
+                            <div key={comp} className="px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/50 transition-colors">
+                              {isEditing ? (
+                                <div className="flex-1 flex items-center space-x-2">
+                                  <input
+                                    type="text"
+                                    value={renameCompanyInput}
+                                    onChange={(e) => setRenameCompanyInput(e.target.value)}
+                                    className="flex-1 rounded-xl border border-slate-200 p-2 text-xs focus:border-sky-500 focus:outline-hidden text-slate-800 bg-white"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleRenameCompany(comp)}
+                                    className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-[11px] font-bold text-white transition-colors cursor-pointer"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => setRenamingCompany(null)}
+                                    className="rounded-lg bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-600 transition-colors cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <div>
+                                    <div className="font-bold text-slate-800 text-sm">{comp}</div>
+                                    <div className="text-[10px] text-slate-400 mt-1">
+                                      {isInUse ? "Linked to active postings (will default to fallback if deleted)" : "Unused entity (safe to delete)"}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2 self-end sm:self-auto">
+                                    <button
+                                      onClick={() => {
+                                        setRenamingCompany(comp);
+                                        setRenameCompanyInput(comp);
+                                      }}
+                                      className="inline-flex items-center space-x-1 rounded-lg bg-slate-100 hover:bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 transition-colors cursor-pointer"
+                                    >
+                                      Rename
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteCompany(comp)}
+                                      className="inline-flex items-center justify-center rounded-lg p-1.5 transition-colors bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer"
+                                      title={isInUse ? "Delete entity (Associated jobs will fallback gracefully)" : "Delete entity"}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
         )}
 
@@ -1008,7 +1519,7 @@ export default function App() {
                 <div className="mt-4">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Group Entity</label>
                   <div className="mt-2 space-y-1">
-                    {GROUP_COMPANIES.map((company) => (
+                    {["All Entities", ...companies].map((company) => (
                       <button
                         key={company}
                         onClick={() => setSelectedCompany(company)}
@@ -1028,7 +1539,7 @@ export default function App() {
                 <div className="mt-6 border-t border-slate-50 pt-4">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Sector wise Categories</label>
                   <div className="mt-2 space-y-1">
-                    {CATEGORIES.map((cat) => (
+                    {["All Categories", ...categories].map((cat) => (
                       <button
                         key={cat}
                         onClick={() => setSelectedCategory(cat)}
@@ -1047,7 +1558,7 @@ export default function App() {
               </div>
 
               {/* My Submissions Track Area inside Sidebar */}
-              {currentUser ? (
+              {currentUser && (
                 <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xs">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 font-sans">Applications Submitted ({applications.filter(a => a.employeeEmail === currentUser.email).length})</h4>
                   <div className="mt-3 space-y-3">
@@ -1071,22 +1582,6 @@ export default function App() {
                       ))
                     )}
                   </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-5 text-center shadow-xs">
-                  <BookmarkCheck className="mx-auto h-6 w-6 text-slate-350" />
-                  <h4 className="text-xs font-bold text-slate-700 mt-1.5">Track Your Submittals</h4>
-                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Currently browsing as external public guest. Sign in to monitor application states.</p>
-                  <button
-                    onClick={() => {
-                      setLoginEmailInput("");
-                      setLoginError("");
-                      setIsLoginModalOpen(true);
-                    }}
-                    className="mt-3 w-full rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 py-1.5 text-xs font-bold transition-all"
-                  >
-                    Authenticate Account
-                  </button>
                 </div>
               )}
 
@@ -1224,7 +1719,7 @@ export default function App() {
               {/* Benefits Perk list */}
               {selectedJob.benefits && selectedJob.benefits.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-bold text-slate-800 font-display uppercase tracking-wider">Apex Group Perks</h4>
+                  <h4 className="text-sm font-bold text-slate-800 font-display uppercase tracking-wider">Rangpur Group Perks</h4>
                   <ul className="mt-2.5 space-y-1.5">
                     {selectedJob.benefits.map((ben, i) => (
                       <li key={i} className="flex items-start text-sm text-slate-65s text-slate-600">
@@ -1240,7 +1735,6 @@ export default function App() {
               {isApplyDrawerOpen && (
                 <div className="border-t border-slate-200/80 pt-6 space-y-4">
                   <div className="flex items-center space-x-1">
-                    <Sparkles className="h-4.5 w-4.5 text-sky-500" />
                     <h4 className="text-sm font-bold text-slate-800 font-display">Internal Application Form</h4>
                   </div>
                   
@@ -1366,16 +1860,88 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Supporting Document filename */}
-                      <div>
-                        <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px]">Supporting Document / Recommendation Letter name (Optional)</label>
-                        <input
-                          type="text"
-                          value={uploadedDocName}
-                          placeholder="e.g. recommendation_letter.pdf, certification_record.png"
-                          onChange={(e) => setUploadedDocName(e.target.value)}
-                          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:border-sky-500 focus:outline-hidden"
-                        />
+                      {/* Supplementary Documents multi-upload list */}
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Upload Supporting Documents (Optional)</span>
+                        <p className="text-[10px] text-slate-400 mt-0.5 font-sans">Attach credentials, transcripts, recommendation letters or certificates to your application profile.</p>
+
+                        {extraFileError && (
+                          <div className="rounded-lg bg-rose-50 p-2 text-[10px] font-bold text-rose-600 border border-rose-100">
+                            {extraFileError}
+                          </div>
+                        )}
+
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <div className="w-full sm:w-1/2">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">Document Purpose</label>
+                            <select
+                              value={selectedDocType}
+                              onChange={(e) => setSelectedDocType(e.target.value)}
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2 text-xs focus:border-sky-500 focus:outline-hidden text-slate-700 font-sans cursor-pointer"
+                            >
+                              <option value="Academic Transcript">Academic Transcript</option>
+                              <option value="Experience Letters">Experience Letters</option>
+                              <option value="Professional Certification">Professional Certification</option>
+                              <option value="National ID / Passport">National ID / Passport</option>
+                              <option value="Recommendation Letters">Recommendation Letters</option>
+                              <option value="Cover Letter Message File">Cover Letter Message File</option>
+                              <option value="Other Portfolio">Other Portfolio</option>
+                            </select>
+                          </div>
+                          <div className="w-full sm:w-1/2 self-end">
+                            <button
+                              type="button"
+                              onClick={() => document.getElementById("extra-doc-picker")?.click()}
+                              className="w-full inline-flex items-center justify-center space-x-1.5 rounded-xl border border-dashed border-sky-300 bg-sky-50 hover:bg-sky-100/70 p-2 text-xs font-bold text-sky-700 transition-colors cursor-pointer"
+                            >
+                              <UploadCloud className="h-4 w-4" />
+                              <span>Select {selectedDocType}</span>
+                            </button>
+                            <input
+                              type="file"
+                              id="extra-doc-picker"
+                              className="hidden"
+                              onChange={handleAddExtraDocument}
+                              accept="*/*"
+                            />
+                          </div>
+                        </div>
+
+                        {/* List of currently attached documents */}
+                        {attachedDocuments.length > 0 && (
+                          <div className="space-y-2 pt-2 border-t border-slate-200">
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">Currently Attached Files ({attachedDocuments.length})</span>
+                            <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+                              {attachedDocuments.map((doc) => {
+                                const sizeInKb = Math.round(doc.size / 1024);
+                                return (
+                                  <div key={doc.id} className="flex items-center justify-between p-2 rounded-xl border border-slate-100 bg-white shadow-3xs hover:border-slate-350 transition-colors">
+                                    <div className="flex items-center space-x-2 w-10/12">
+                                      <FileText className={`h-4.5 w-4.5 shrink-0 ${doc.type === "CV/Resume" ? "text-indigo-500" : "text-sky-500"}`} />
+                                      <div className="truncate flex-1">
+                                        <p className="text-xs font-bold text-slate-700 truncate" title={doc.name}>{doc.name}</p>
+                                        <div className="flex items-center space-x-1.5 mt-0.5">
+                                          <span className="text-[9px] font-extrabold text-sky-600 bg-sky-50 border border-sky-100 px-1 rounded font-sans">
+                                            {doc.type}
+                                          </span>
+                                          <span className="text-[9px] text-slate-400">{sizeInKb} KB</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveExtraDocument(doc.id)}
+                                      className="p-1 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                      title="Remove document"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex justify-end pt-2">
@@ -1438,6 +2004,8 @@ export default function App() {
           }}
           onPublish={handlePublishJob}
           initialJob={editingJob}
+          categories={categories}
+          companies={companies}
         />
       )}
 

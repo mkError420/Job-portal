@@ -17,6 +17,15 @@ export interface JobPost {
   status: 'Active' | 'Closed';
 }
 
+export interface UploadedDocument {
+  id: string;
+  name: string;
+  type: string; // e.g. "CV/Resume", "Cover Letter", "Academic Transcript", "Experience Letter", "NID/Passport", "Certificates", "Portfolio/Other"
+  content: string; // Base64 data URL
+  fileType: string; // MIME type
+  size: number; // File size in bytes
+}
+
 export interface Application {
   id: string;
   jobId: string;
@@ -30,6 +39,7 @@ export interface Application {
   cvContent?: string; // Base64 or text contents
   documentName?: string;
   coverLetter?: string;
+  documents?: UploadedDocument[];
   status: ApplicationStatus;
   appliedAt: string;
   adminNotes?: string;

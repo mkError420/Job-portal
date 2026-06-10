@@ -62,7 +62,7 @@ export default function DashboardStats({ stats, applications }: DashboardStatsPr
             </div>
           </div>
           <div className="mt-4 flex items-center text-xs text-slate-500">
-            <span className="font-semibold text-emerald-600 mr-1">Apex Group</span>
+            <span className="font-semibold text-emerald-600 mr-1">Rangpur Group</span>
             <span>across all 4 corporate divisions</span>
           </div>
         </div>
