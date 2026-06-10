@@ -32,10 +32,26 @@ async function readDB() {
     "Rangpur Logistics",
     "Rangpur Group HQ"
   ];
+  const defaultSettings = {
+    portalName: "JOB PORTAL",
+    portalSubtitle: "Global Career Gate",
+    logoBase64: "",
+    admins: [
+      "mk.rabbani.cse@gmail.com",
+      "admin.hq@apex-group.com"
+    ]
+  };
 
   try {
     if (!fs.existsSync(DB_FILE)) {
-      return { jobs: [], applications: [], notifications: [], categories: defaultCategories, companies: defaultCompanies };
+      return { 
+        jobs: [], 
+        applications: [], 
+        notifications: [], 
+        categories: defaultCategories, 
+        companies: defaultCompanies, 
+        settings: defaultSettings 
+      };
     }
     const data = await fs.promises.readFile(DB_FILE, "utf-8");
     const parsed = JSON.parse(data);
@@ -45,6 +61,18 @@ async function readDB() {
     if (!parsed.companies || !Array.isArray(parsed.companies)) {
       parsed.companies = defaultCompanies;
     }
+    if (!parsed.settings || typeof parsed.settings !== "object") {
+      parsed.settings = defaultSettings;
+    } else {
+      // Ensure admins exists
+      if (!parsed.settings.admins || !Array.isArray(parsed.settings.admins)) {
+        parsed.settings.admins = defaultSettings.admins;
+      }
+      // Guarantee mk.rabbani.cse@gmail.com is an admin
+      if (!parsed.settings.admins.includes("mk.rabbani.cse@gmail.com")) {
+        parsed.settings.admins.push("mk.rabbani.cse@gmail.com");
+      }
+    }
     return parsed;
   } catch (err) {
     console.error("Database reading error, starting empty:", err);
@@ -53,7 +81,8 @@ async function readDB() {
       applications: [],
       notifications: [],
       categories: defaultCategories,
-      companies: defaultCompanies
+      companies: defaultCompanies,
+      settings: defaultSettings
     };
   }
 }
@@ -465,7 +494,7 @@ app.get("/api/applications/stats", async (req, res) => {
 
 // 7. Apply Internally (Submit application with automatic resume parsing & evaluator)
 app.post("/api/applications", async (req, res) => {
-  const { jobId, employeeName, employeeEmail, employeeId, currentRole, cvName, cvContent, documentName, coverLetter, documents } = req.body;
+  const { jobId, employeeName, employeeEmail, employeeId, currentRole, cvName, cvContent, documentName, coverLetter, documents, phoneNumber } = req.body;
 
   if (!jobId || !employeeName || !employeeEmail || !employeeId) {
     return res.status(400).json({ error: "Missing candidate credentials" });
@@ -502,6 +531,7 @@ app.post("/api/applications", async (req, res) => {
     cvContent: cvContent || "",
     documentName: documentName || "",
     coverLetter: coverLetter || "",
+    phoneNumber: phoneNumber || "",
     documents: documents || [],
     status: "Applied",
     appliedAt: new Date().toISOString(),
@@ -575,6 +605,48 @@ app.put("/api/applications/:id/notes", async (req, res) => {
   res.json(db.applications[appIndex]);
 });
 
+// 9.5 Delete Candidate Application Profile (Admin)
+app.delete("/api/applications/:id", async (req, res) => {
+  const db = await readDB();
+  const index = db.applications.findIndex((a: any) => a.id === req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ error: "Application profile record not found" });
+  }
+  db.applications.splice(index, 1);
+  await writeDB(db);
+  res.json({ success: true, message: "Application profile deleted successfully", deletedId: req.params.id });
+});
+
+// 9.6 Get Portal Settings
+app.get("/api/settings", async (req, res) => {
+  const db = await readDB();
+  res.json(db.settings);
+});
+
+// 9.7 Update Portal Settings (Change portal name, admins, logo, etc.)
+app.put("/api/settings", async (req, res) => {
+  const { portalName, portalSubtitle, logoBase64, admins } = req.body;
+  if (!portalName || typeof portalName !== "string" || !portalName.trim()) {
+    return res.status(400).json({ error: "Portal name is required" });
+  }
+
+  const db = await readDB();
+  db.settings = {
+    portalName: portalName.trim(),
+    portalSubtitle: (portalSubtitle || "").trim(),
+    logoBase64: logoBase64 || "",
+    admins: Array.isArray(admins) ? admins.map((e: string) => e.trim().toLowerCase()).filter(Boolean) : db.settings.admins
+  };
+
+  // Keep admin from metadata in the admin pool
+  if (!db.settings.admins.includes("mk.rabbani.cse@gmail.com")) {
+    db.settings.admins.push("mk.rabbani.cse@gmail.com");
+  }
+
+  await writeDB(db);
+  res.json(db.settings);
+});
+
 // 10. Notifications List
 app.get("/api/notifications", async (req, res) => {
   const db = await readDB();
@@ -609,6 +681,7 @@ app.get("/api/export", async (req, res) => {
       "Employee ID",
       "Candidate Name",
       "Employee Email",
+      "Phone Number",
       "Current Role",
       "Applied Position",
       "Company Entity",
@@ -625,6 +698,7 @@ app.get("/api/export", async (req, res) => {
         app.employeeId,
         `"${app.employeeName.replace(/"/g, '""')}"`,
         app.employeeEmail,
+        `"${(app.phoneNumber || "").replace(/"/g, '""')}"`,
         `"${app.currentRole.replace(/"/g, '""')}"`,
         `"${app.jobTitle.replace(/"/g, '""')}"`,
         `"${app.companyName.replace(/"/g, '""')}"`,

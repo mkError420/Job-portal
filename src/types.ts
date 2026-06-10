@@ -39,6 +39,7 @@ export interface Application {
   cvContent?: string; // Base64 or text contents
   documentName?: string;
   coverLetter?: string;
+  phoneNumber?: string;
   documents?: UploadedDocument[];
   status: ApplicationStatus;
   appliedAt: string;
@@ -63,4 +64,11 @@ export interface User {
   role: 'Admin' | 'Employee';
   employeeId: string;
   currentRole: string;
+}
+
+export interface PortalSettings {
+  portalName: string;
+  portalSubtitle: string;
+  logoBase64: string;
+  admins: string[];
 }

@@ -27,12 +27,14 @@ import {
   X,
   UploadCloud,
   CheckCircle2,
-  BookmarkCheck
+  BookmarkCheck,
+  Settings
 } from "lucide-react";
 import DashboardStats from "./components/DashboardStats";
 import JobCard from "./components/JobCard";
 import ApplicationDetailsModal from "./components/ApplicationDetailsModal";
 import JobPublishForm from "./components/JobPublishForm";
+import { PortalSettings } from "./types";
 
 // Presets for simulated internal employees
 const MOCK_EMPLOYEES: User[] = [
@@ -85,10 +87,19 @@ export default function App() {
 
   // New Job Publishers status
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
-  // Admin selected tab ("applications" | "jobs" | "categories" | "companies")
-  const [adminTab, setAdminTab] = useState<"applications" | "jobs" | "categories" | "companies">("applications");
+  // Admin selected tab ("applications" | "jobs" | "categories" | "companies" | "settings")
+  const [adminTab, setAdminTab] = useState<"applications" | "jobs" | "categories" | "companies" | "settings">("applications");
   // Editing Job state
   const [editingJob, setEditingJob] = useState<JobPost | null>(null);
+
+  // Dynamic portal configurations & settings
+  const [settings, setSettings] = useState<PortalSettings>({
+    portalName: "JOB PORTAL",
+    portalSubtitle: "Global Career Gate",
+    logoBase64: "",
+    admins: ["mk.rabbani.cse@gmail.com", "admin.hq@apex-group.com"]
+  });
+  const [newAdminEmail, setNewAdminEmail] = useState("");
 
   // Categories CRUD and state management
   const [categories, setCategories] = useState<string[]>([
@@ -289,6 +300,7 @@ export default function App() {
   const [guestEmail, setGuestEmail] = useState("");
   const [guestCurrentRole, setGuestCurrentRole] = useState("");
   const [guestEmployeeId, setGuestEmployeeId] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
 
   // Authenticated Login controls
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -314,13 +326,14 @@ export default function App() {
   // Load backend variables
   const fetchAllData = async () => {
     try {
-      const [jobsRes, appsRes, notifsRes, statsRes, catsRes, compsRes] = await Promise.all([
+      const [jobsRes, appsRes, notifsRes, statsRes, catsRes, compsRes, settingsRes] = await Promise.all([
         fetch("/api/jobs"),
         fetch("/api/applications"),
         currentUser ? fetch(`/api/notifications?email=${currentUser.email}`) : Promise.resolve(null),
         fetch("/api/applications/stats"),
         fetch("/api/categories"),
-        fetch("/api/companies")
+        fetch("/api/companies"),
+        fetch("/api/settings")
       ]);
 
       if (jobsRes.ok) setJobs(await jobsRes.json());
@@ -333,6 +346,7 @@ export default function App() {
       if (statsRes.ok) setDashboardStats(await statsRes.json());
       if (catsRes.ok) setCategories(await catsRes.json());
       if (compsRes.ok) setCompanies(await compsRes.json());
+      if (settingsRes && settingsRes.ok) setSettings(await settingsRes.json());
     } catch (e) {
       console.error("Error communicating with Node backend:", e);
     }
@@ -367,12 +381,14 @@ export default function App() {
 
   const fetchAppsAndStats = async () => {
     try {
-      const [appsRes, statsRes] = await Promise.all([
+      const [appsRes, statsRes, settingsRes] = await Promise.all([
         fetch("/api/applications"),
-        fetch("/api/applications/stats")
+        fetch("/api/applications/stats"),
+        fetch("/api/settings")
       ]);
       if (appsRes.ok) setApplications(await appsRes.json());
       if (statsRes.ok) setDashboardStats(await statsRes.json());
+      if (settingsRes && settingsRes.ok) setSettings(await settingsRes.json());
     } catch (e) {
       console.error(e);
     }
@@ -399,17 +415,23 @@ export default function App() {
     }
     const cleaned = email.trim().toLowerCase();
     const matched = MOCK_EMPLOYEES.find(e => e.email.toLowerCase() === cleaned);
+    
+    // Check if the email belongs to settings admins
+    const isUserAdmin = settings.admins.some(adm => adm.toLowerCase() === cleaned) || cleaned === "mk.rabbani.cse@gmail.com";
 
     if (matched) {
-      setCurrentUser(matched);
+      setCurrentUser({
+        ...matched,
+        role: isUserAdmin ? "Admin" : "Employee"
+      });
     } else {
       // Dynamic profile instantiation
       const newUser: User = {
         email: cleaned,
         name: cleaned.split("@")[0].split(".").map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(" "),
-        role: cleaned === "mk.rabbani.cse@gmail.com" ? "Admin" : "Employee",
+        role: isUserAdmin ? "Admin" : "Employee",
         employeeId: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
-        currentRole: "Dynamic External Talent"
+        currentRole: isUserAdmin ? "Dynamic Administrative Officer" : "Dynamic External Talent"
       };
       setCurrentUser(newUser);
     }
@@ -429,6 +451,7 @@ export default function App() {
     setGuestEmail("");
     setGuestCurrentRole("");
     setGuestEmployeeId("");
+    setGuestPhone("");
     setApplyState({ loading: false, error: "", success: false });
   };
 
@@ -538,6 +561,52 @@ export default function App() {
     // For local convenience we can just filter it on client or backend can be called if implemented
     // Let's implement full functional local state clearing so candidate can reapply if they want
     alert("Application withdrawn successfully.");
+  };
+
+  // Delete Candidate Application Profile (Admin action)
+  const handleDeleteApplication = async (appId: string) => {
+    if (!confirm("Are you sure you want to permanently delete this candidate's application profile? All records of their files, status, and AI score evaluations will be permanently removed.")) return;
+    try {
+      const res = await fetch(`/api/applications/${appId}`, {
+        method: "DELETE"
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to delete application profile.");
+      }
+
+      setApplications(prev => prev.filter(a => a.id !== appId));
+      if (selectedApplication?.id === appId) {
+        setSelectedApplication(null);
+      }
+      fetchAppsAndStats();
+      alert("Application profile has been permanently deleted.");
+    } catch (e: any) {
+      alert(e.message || "Error deleting application profile.");
+    }
+  };
+
+  // Update Settings (Admin action)
+  const handleUpdateSettings = async (updated: PortalSettings) => {
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to update settings.");
+      }
+
+      const saved = await res.json();
+      setSettings(saved);
+      return saved;
+    } catch (e: any) {
+      alert(e.message || "Error updating settings.");
+      return false;
+    }
   };
 
   // Reading resume text on client file upload
@@ -662,9 +731,15 @@ export default function App() {
     const applicantEmail = currentUser ? currentUser.email : guestEmail.trim();
     const applicantRole = currentUser ? currentUser.currentRole : guestCurrentRole.trim();
     const applicantId = currentUser ? currentUser.employeeId : (guestEmployeeId.trim() || `GUEST-${Math.floor(1000 + Math.random() * 9500)}`);
+    const applicantPhone = guestPhone.trim();
 
     if (!applicantName || !applicantEmail) {
       setApplyState(p => ({ ...p, error: "Please enter your Name and Email details to proceed." }));
+      return;
+    }
+
+    if (!applicantPhone) {
+      setApplyState(p => ({ ...p, error: "Please enter your Phone number to proceed." }));
       return;
     }
 
@@ -685,6 +760,7 @@ export default function App() {
       cvContent: uploadedCvContent,
       documentName: uploadedDocName || "",
       coverLetter: coverLetter.trim(),
+      phoneNumber: applicantPhone,
       documents: attachedDocuments
     };
 
@@ -715,6 +791,7 @@ export default function App() {
         setUploadedCvContent("");
         setUploadedDocName("");
         setAttachedDocuments([]);
+        setGuestPhone("");
         setApplyState(p => ({ ...p, success: false }));
       }, 2500);
 
@@ -755,14 +832,27 @@ export default function App() {
       <nav className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 py-3.5 shadow-xs backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6">
           
-          {/* Logo Name */}
+          {/* Logo Name & Branded Header */}
           <div className="flex items-center space-x-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600 font-display text-lg font-bold text-white shadow-xs font-display">
-              R
-            </div>
+            {settings?.logoBase64 ? (
+              <img 
+                src={settings.logoBase64} 
+                alt="Logo" 
+                className="h-10 w-10 object-contain rounded-xl border border-slate-100"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600 font-display text-lg font-bold text-white shadow-xs font-display">
+                {settings?.portalName ? settings.portalName.charAt(0).toUpperCase() : 'J'}
+              </div>
+            )}
             <div>
-              <span className="text-base font-extrabold tracking-tight text-slate-800 font-display">RANGPUR GROUP</span>
-              <span className="block text-[10px] font-bold uppercase tracking-widest text-sky-600 font-sans">Global Career Gate</span>
+              <span className="text-base font-extrabold tracking-tight text-slate-800 font-display uppercase">
+                {settings?.portalName || "RANGPUR GROUP"}
+              </span>
+              <span className="block text-[10px] font-bold uppercase tracking-widest text-sky-600 font-sans">
+                {settings?.portalSubtitle || "Global Career Gate"}
+              </span>
             </div>
           </div>
 
@@ -1010,6 +1100,18 @@ export default function App() {
                 <Building className="h-4 w-4" />
                 <span>Group Entities ({companies.length})</span>
               </button>
+              <button
+                onClick={() => setAdminTab("settings")}
+                id="btn-admin-settings-tab"
+                className={`py-3 px-6 text-sm font-bold border-b-2 transition-all flex items-center space-x-2 ${
+                  adminTab === "settings"
+                    ? "border-sky-600 text-sky-600 font-bold"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Settings className="h-4 w-4" />
+                <span>Portal Settings</span>
+              </button>
             </div>
 
             {/* Applications List & Tracking Filters Section */}
@@ -1124,7 +1226,7 @@ export default function App() {
                                 {app.status}
                               </span>
                             </td>
-                            <td className="px-5 py-3.5 text-right">
+                            <td className="px-5 py-3.5 text-right flex items-center justify-end space-x-1.5">
                               <button
                                 onClick={() => setSelectedApplication(app)}
                                 id={`btn-manage-${app.id}`}
@@ -1132,6 +1234,15 @@ export default function App() {
                               >
                                 <Eye className="h-3.5 w-3.5" />
                                 <span>Track</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteApplication(app.id)}
+                                id={`btn-delete-${app.id}`}
+                                title="Delete applicant profile"
+                                className="inline-flex items-center space-x-1 rounded-lg bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 font-semibold text-rose-600 hover:text-rose-700 transition-colors"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span>Delete</span>
                               </button>
                             </td>
                           </tr>
@@ -1499,6 +1610,195 @@ export default function App() {
                 </div>
               </section>
             )}
+
+            {/* Portal Settings Maintenance Section */}
+            {adminTab === "settings" && (
+              <section className="space-y-6 font-sans max-w-4xl">
+                <div>
+                  <h2 className="text-base font-bold text-slate-800 font-display">Global Portal Configurations</h2>
+                  <p className="text-xs text-slate-400">Configure corporate branding identity, update platform administrators pool, and upload an original site logo.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Left Column: Portal Name & Subtitle & Logo Upload */}
+                  <div className="md:col-span-2 space-y-6">
+                    <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-xs space-y-4">
+                      <h3 className="text-xs font-bold text-slate-800 font-display uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center space-x-1.5 text-sky-700">
+                        <Settings className="h-3.5 w-3.5" />
+                        <span>Branding Identity</span>
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Portal Name</label>
+                          <input
+                            type="text"
+                            value={settings.portalName}
+                            onChange={(e) => handleUpdateSettings({ ...settings, portalName: e.target.value })}
+                            placeholder="e.g. RANGPUR GROUP"
+                            className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-xs font-semibold focus:border-sky-500 focus:outline-hidden text-slate-850 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Portal Subtitle</label>
+                          <input
+                            type="text"
+                            value={settings.portalSubtitle}
+                            onChange={(e) => handleUpdateSettings({ ...settings, portalSubtitle: e.target.value })}
+                            placeholder="e.g. Global Career Gate"
+                            className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-xs font-semibold focus:border-sky-500 focus:outline-hidden text-slate-850 bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Site Logo Upload Content */}
+                      <div className="space-y-3 pt-2">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Dynamic Site Logo Image</label>
+                        <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 border border-dashed border-slate-200 rounded-2xl p-4 bg-slate-50/50">
+                          <div className="flex-1">
+                            <p className="text-[11px] text-slate-500 leading-relaxed">Upload a beautiful PNG, JPEG, or SVG logo to dynamically replace the default icon placeholder immediately across the career dashboard.</p>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              id="settings-logo-upload"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    const base64 = event.target?.result as string;
+                                    handleUpdateSettings({ ...settings, logoBase64: base64 });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                              className="hidden"
+                            />
+                            <div className="flex space-x-2 mt-3">
+                              <label
+                                htmlFor="settings-logo-upload"
+                                className="cursor-pointer inline-flex items-center space-x-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-xs hover:bg-sky-700 active:scale-95 transition-all"
+                              >
+                                <UploadCloud className="h-3.5 w-3.5" />
+                                <span>Upload Logo File</span>
+                              </label>
+                              {settings.logoBase64 && (
+                                <button
+                                  onClick={() => handleUpdateSettings({ ...settings, logoBase64: "" })}
+                                  className="inline-flex items-center space-x-1 rounded-lg bg-white border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                                >
+                                  <X className="h-3.5 w-3.5 text-rose-500" />
+                                  <span>Reset Placeholder</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          {/* Site logo preview card */}
+                          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-white shadow-xs p-2">
+                            {settings.logoBase64 ? (
+                              <img
+                                src={settings.logoBase64}
+                                alt="Logo Preview"
+                                className="h-full w-full object-contain rounded-xl"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="text-[10px] font-bold text-slate-400 text-center uppercase">
+                                No Logo
+                                <span className="block text-[8px] text-slate-300 font-normal">Placeholder J</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Manage & Add Administrators */}
+                  <div className="md:col-span-1 space-y-6">
+                    {/* Add Admin form */}
+                    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xs space-y-4">
+                      <h3 className="text-xs font-bold text-slate-800 font-display uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center space-x-1.5 text-sky-700">
+                        <Users className="h-3.5 w-3.5" />
+                        <span>Add New Admin</span>
+                      </h3>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Corporate Email Address</label>
+                        <input
+                          type="email"
+                          value={newAdminEmail}
+                          onChange={(e) => setNewAdminEmail(e.target.value)}
+                          placeholder="e.g. partner@apex-group.com"
+                          className="mt-1 w-full rounded-xl border border-slate-200 p-2 text-xs focus:border-sky-500 focus:outline-hidden text-slate-850 bg-white font-semibold"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          const cleaned = newAdminEmail.trim().toLowerCase();
+                          if (!cleaned) {
+                            alert("Please provide a valid email address.");
+                            return;
+                          }
+                          if (settings.admins.map(a => a.toLowerCase()).includes(cleaned)) {
+                            alert("This user is already a portal administrator.");
+                            return;
+                          }
+                          const updatedAdmins = [...settings.admins, cleaned];
+                          handleUpdateSettings({ ...settings, admins: updatedAdmins }).then((success) => {
+                            if (success) {
+                              setNewAdminEmail("");
+                              alert(`Successfully added ${cleaned} to the recruitment administration pool.`);
+                            }
+                          });
+                        }}
+                        className="w-full inline-flex items-center justify-center space-x-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-700 active:scale-95 transition-all text-center cursor-pointer"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Grant Admin Rights</span>
+                      </button>
+                    </div>
+
+                    {/* Admin List Card */}
+                    <div className="rounded-2xl border border-slate-100 bg-white overflow-hidden shadow-xs font-sans">
+                      <div className="bg-slate-50 px-4 py-2 border-b border-slate-100">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-sans">Corporate Admins ({settings.admins.length})</span>
+                      </div>
+                      <div className="divide-y divide-slate-100">
+                        {settings.admins.map((email) => {
+                          const isDefaultAdmin = email.toLowerCase() === "mk.rabbani.cse@gmail.com";
+                          return (
+                            <div key={email} className="p-3.5 flex items-center justify-between text-xs hover:bg-slate-50/50 transition-colors">
+                              <div className="overflow-hidden mr-2">
+                                <p className="font-bold text-slate-800 truncate" title={email}>{email}</p>
+                                <p className="text-[9px] text-slate-450 mt-0.5">
+                                  {isDefaultAdmin ? "Platform Owner Account" : "Registered Administrator"}
+                                </p>
+                              </div>
+                              {!isDefaultAdmin && (
+                                <button
+                                  onClick={() => {
+                                    if (!confirm(`Are you sure you want to revoke administrative permissions for ${email}?`)) return;
+                                    const updatedAdmins = settings.admins.filter(a => a !== email);
+                                    handleUpdateSettings({ ...settings, admins: updatedAdmins }).then((success) => {
+                                      if (success) {
+                                        alert(`Revoked access keys for ${email}. Checked users will log back in as employees.`);
+                                      }
+                                    });
+                                  }}
+                                  className="text-slate-400 hover:text-rose-600 p-1 rounded-md hover:bg-rose-50 transition-all cursor-pointer"
+                                  title="Revoke admin access rights"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
         )}
 
@@ -1735,7 +2035,7 @@ export default function App() {
               {isApplyDrawerOpen && (
                 <div className="border-t border-slate-200/80 pt-6 space-y-4">
                   <div className="flex items-center space-x-1">
-                    <h4 className="text-sm font-bold text-slate-800 font-display">Internal Application Form</h4>
+                    <h4 className="text-sm font-bold text-slate-800 font-display">Application Form</h4>
                   </div>
                   
                   {applyState.error && (
@@ -1755,14 +2055,28 @@ export default function App() {
                       
                       {/* User display or dynamic Guest inputs */}
                       {currentUser ? (
-                        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                          <div>
-                            <span className="text-slate-400 text-[10px]">Your Name:</span>
-                            <p className="text-slate-700 font-bold mt-0.5">{currentUser.name}</p>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 text-[10px]">Your Employee ID:</span>
-                            <p className="text-slate-700 font-bold mt-0.5">{currentUser.employeeId}</p>
+                        <div className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-200">
+                          <p className="text-xs font-semibold text-slate-600 border-b border-slate-200 pb-1.5 uppercase tracking-wider">Applicant Basic Profile Details</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <span className="text-slate-400 text-[10px]">Your Name:</span>
+                              <p className="text-slate-700 font-bold mt-0.5">{currentUser.name}</p>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 text-[10px]">Your Employee ID:</span>
+                              <p className="text-slate-700 font-bold mt-0.5">{currentUser.employeeId}</p>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Phone Number *</label>
+                              <input
+                                type="tel"
+                                required
+                                value={guestPhone}
+                                onChange={(e) => setGuestPhone(e.target.value)}
+                                placeholder="e.g. +880 1712-34-5678"
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs focus:border-sky-500 focus:outline-hidden"
+                              />
+                            </div>
                           </div>
                         </div>
                       ) : (
@@ -1791,24 +2105,14 @@ export default function App() {
                                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs focus:border-sky-500 focus:outline-hidden"
                               />
                             </div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Professional Role / Title *</label>
+                            <div className="sm:col-span-2">
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Phone Number *</label>
                               <input
-                                type="text"
+                                type="tel"
                                 required
-                                value={guestCurrentRole}
-                                onChange={(e) => setGuestCurrentRole(e.target.value)}
-                                placeholder="e.g. Software Engineer"
-                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs focus:border-sky-500 focus:outline-hidden"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Employee ID (Corporate / Optional)</label>
-                              <input
-                                type="text"
-                                value={guestEmployeeId}
-                                onChange={(e) => setGuestEmployeeId(e.target.value)}
-                                placeholder="e.g. EMP-9921 (Optional)"
+                                value={guestPhone}
+                                onChange={(e) => setGuestPhone(e.target.value)}
+                                placeholder="e.g. +880 1712-34-5678"
                                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs focus:border-sky-500 focus:outline-hidden"
                               />
                             </div>
