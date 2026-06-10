@@ -1,0 +1,178 @@
+{
+  "jobs": [
+    {
+      "id": "job-1",
+      "title": "Senior React Developer",
+      "category": "Technology & IT",
+      "department": "Engineering Development",
+      "companyName": "Apex Digital",
+      "location": "Dhaka, Bangladesh (Hybrid)",
+      "type": "Full-Time",
+      "salaryRange": "৳120,000 - ৳160,000 / month",
+      "description": "We are seeking a Senior React Developer to join our internal digital transformation team. You will lead the migration of legacy intranet portals to modern React-based systems and mentor junior web engineers.",
+      "requirements": [
+        "4+ years of professional React and TypeScript development experience.",
+        "Deep understanding of modern state management (Zustand, React Context, Redux Toolkit).",
+        "Experience in optimizing micro-frontends and build performance via Vite.",
+        "Excellent communication and collaboration skills with cross-functional teams."
+      ],
+      "benefits": [
+        "Double festival bonus yearly.",
+        "Subsidized high-quality lunch and snacks.",
+        "Comprehensive family health insurance.",
+        "Flexible working hours and 2 days hybrid option."
+      ],
+      "createdAt": "2026-06-01T09:00:00Z",
+      "status": "Active"
+    },
+    {
+      "id": "job-2",
+      "title": "FinTech Financial Analyst",
+      "category": "Finance & Accounts",
+      "department": "Corporate Accounts",
+      "companyName": "Apex Capital",
+      "location": "Sylhet (On-site)",
+      "type": "Full-Time",
+      "salaryRange": "৳90,000 - ৳110,000 / month",
+      "description": "Apex Capital is expanding its risk assessment team. We are looking for an experienced Analyst to review digital micro-lending profiles, evaluate group financial risks, and prepare board compliance reports.",
+      "requirements": [
+        "Graduate or Postgraduate in Finance, Business, or related fields (CFA is a major plus).",
+        "2+ years of experience in credit risk modeling or financial analysts roles in retail banking.",
+        "Expertise in Excel modeling, SQL-based ledger querying, or Tableau dashboards.",
+        "Ability to make data-driven decisions under fast corporate timelines."
+      ],
+      "benefits": [
+        "Yearly performance-linked profit bonus.",
+        "Subsidized executive corporate gym memberships.",
+        "Ongoing certifications budget coverage (up to ৳50,000 per year).",
+        "Annual residential team outings."
+      ],
+      "createdAt": "2026-06-03T10:15:00Z",
+      "status": "Active"
+    },
+    {
+      "id": "job-3",
+      "title": "Corporate Talent Acquisition Specialist",
+      "category": "Human Resources",
+      "department": "Strategic HR",
+      "companyName": "Apex Group HQ",
+      "location": "Dhaka, Bangladesh (On-site)",
+      "type": "Full-Time",
+      "salaryRange": "৳70,000 - ৳85,000 / month",
+      "description": "Join our Strategic HR cell at Apex Group Headquarters. You will drive group-wide internal hiring, design professional onboarding flows, and run employer branding and employee engagement programs.",
+      "requirements": [
+        "BBA/MBA in Human Resource Management (HRM).",
+        "Minimum 2 years of corporate recruiting experience (technical recruiting is a plus).",
+        "Strong familiarity with modern Applicant Tracking Systems (ATS) and job portals.",
+        "Warm interpersonal skills with a strong command of professional English."
+      ],
+      "benefits": [
+        "Performance incentives on prompt talent placements.",
+        "Full medical and OPD corporate discount scheme.",
+        "Gratuity and provident fund subscription options.",
+        "Active team bonding events."
+      ],
+      "createdAt": "2026-06-05T14:30:00Z",
+      "status": "Active"
+    },
+    {
+      "id": "job-4",
+      "title": "Lead UI/UX Designer",
+      "category": "Design & Creatives",
+      "department": "Aesthetics Team",
+      "companyName": "Apex Digital",
+      "location": "Remote (GMT+6)",
+      "type": "Remote",
+      "salaryRange": "৳110,000 - ৳140,000 / month",
+      "description": "A designer-centric role spearheading beautiful user-experience layouts for Apex Digital's public applications. Build design systems, run prototype sessions, and review visual guidelines.",
+      "requirements": [
+        "3+ years of professional full-time digital UX/UI design experience.",
+        "A staggering design portfolio showcasing responsive layout mastery, elegant typography, and strict user hierarchies.",
+        "Advanced proficiency in Figma components, auto-layouts, and prototyping structures.",
+        "Solid design ethics focusing on high-contrast accessibility and beautiful responsive grids."
+      ],
+      "benefits": [
+        "Full remote freedom with core collaboration hours (11 AM to 4 PM).",
+        "Premium subscription budgets for UI kits, software tools, and digital books.",
+        "Annual state-of-the-art designer hardware stipend.",
+        "Festive bonuses and performance appraisals."
+      ],
+      "createdAt": "2026-06-06T08:45:00Z",
+      "status": "Active"
+    },
+    {
+      "id": "job-5",
+      "title": "Logistics & Supply Chain Lead",
+      "category": "Engineering & Operations",
+      "department": "Asset management",
+      "companyName": "Apex Logistics",
+      "location": "Chittagong Port Terminal (On-site)",
+      "type": "Full-Time",
+      "salaryRange": "৳100,000 - ৳130,000 / month",
+      "description": "Supervise bulk shipping logistics operations at the Chittagong port terminal. Ensure optimal route scheduling, manage customs documentation clearance, and automate freight tracking logs.",
+      "requirements": [
+        "Bachelor's degree in Industrial Engineering, supply chain management, or related technical disciplines.",
+        "3+ years experience managing dry bulk logistics or warehouse setups.",
+        "Excellent leadership abilities with dynamic conflict resolution skills.",
+        "Technical proficiency in automated route scheduling dashboards."
+      ],
+      "benefits": [
+        "On-site executive living accommodations provided.",
+        "Daily field transit allowances and vehicle facility.",
+        "Bi-annual project completion bonus packages.",
+        "Premium physical checkup coverage."
+      ],
+      "createdAt": "2026-06-07T11:00:00Z",
+      "status": "Active"
+    }
+  ],
+  "applications": [
+    {
+      "id": "app-1",
+      "jobId": "job-1",
+      "jobTitle": "Senior React Developer",
+      "companyName": "Apex Digital",
+      "employeeName": "Sadat Rahman",
+      "employeeEmail": "sadat.react@apex-digital.com",
+      "employeeId": "EMP-9281",
+      "currentRole": "Software Engineer (Frontend)",
+      "cvName": "sadat_rahman_resume.txt",
+      "cvContent": "Sadat Rahman - Frontend Developer\nEmail: sadat.react@apex-digital.com\nSkills: React, Redux, JavaScript, CSS, HTML, Web Optimization\nExperience:\n- 2.5 years as Frontend Dev at Apex Digital\n- Implemented responsive dashboards for client portals.",
+      "coverLetter": "Hello, I have been working as an internal Frontend Software Engineer at Apex Digital for over 2 years now. I'm highly passionate about modernizing our React architecture and taking on more leadership duties as a Senior React Developer.",
+      "status": "Screening",
+      "appliedAt": "2026-06-08T09:15:00Z",
+      "adminNotes": "Solid performance rating in his current role. Has high familiarity with internal codebases. Schedule a technical interview.",
+      "aiScore": 85,
+      "aiAnalysis": "Candidate has 2.5 years of experience directly in React/Frontend inside Apex. Possesses strong UI/UX frontend skills. Meets all foundational requirements; lacks the full 4 years of experience but makes up for it with high internal context."
+    },
+    {
+      "id": "app-2",
+      "jobId": "job-3",
+      "jobTitle": "Corporate Talent Acquisition Specialist",
+      "companyName": "Apex Group HQ",
+      "employeeName": "Nusrat Jahan",
+      "employeeEmail": "nusrat.hr@apex-digital.com",
+      "employeeId": "EMP-3841",
+      "currentRole": "HR Assistant",
+      "cvName": "nusrat_jahan_hr_resume.txt",
+      "cvContent": "Nusrat Jahan\nEmail: nusrat.hr@apex-digital.com\nSkills: Recruiting, employee relations, onboarding, ATS systems\nExperience: 1.5 Years as HR Assistant in Apex Digital.",
+      "coverLetter": "I have been supporting strategic recruitment events over the last 12 months. This TA role aligns perfectly with my professional goals of orchestrating Apex Group's national hiring plans.",
+      "status": "Applied",
+      "appliedAt": "2026-06-09T11:40:00Z",
+      "adminNotes": "Initial screening looks promising. Good communication skills noted by her current director.",
+      "aiScore": 72,
+      "aiAnalysis": "Candidate possesses good recruiting administration skills and has hands-on familiarity with HR setups. Might need guidance on strategic tech sourcing but remains an excellent internal progression candidate."
+    }
+  ],
+  "notifications": [
+    {
+      "id": "notif-1",
+      "employeeEmail": "sadat.react@apex-digital.com",
+      "jobTitle": "Senior React Developer",
+      "message": "Your application for Senior React Developer has been moved to 'Screening'.",
+      "status": "Screening",
+      "createdAt": "2026-06-08T10:00:00Z",
+      "read": false
+    }
+  ]
+}

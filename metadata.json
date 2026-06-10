@@ -1,0 +1,6 @@
+{
+  "name": "Apex Group Career Portal",
+  "description": "Internal job posting portal and integrated Applicant Tracking System (ATS) for Apex Group of Companies with Gemini resume scoring, role-based controls, analytics, and comprehensive CSV reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
